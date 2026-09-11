@@ -1,0 +1,7 @@
+server {
+    listen 80;
+    server_name sports.example.edu.cn;
+    location /api/ { proxy_pass http://127.0.0.1:8000/api/; }
+    location / { root /var/www/sports-meet; try_files $uri $uri/ /index.html; }
+}
+

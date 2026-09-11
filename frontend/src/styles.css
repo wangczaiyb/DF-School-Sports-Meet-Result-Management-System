@@ -1,0 +1,194 @@
+/* 
+  校园运动会成绩管理系统 - Apple Design System (macOS / iOS 17 / VisionOS 风格)
+*/
+
+:root {
+  /* 苹果系统字体规范 */
+  --font-apple: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "SF Pro Icons", "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", Consolas, monospace;
+
+  /* 苹果官方系统色彩 (Apple System Colors) */
+  --apple-blue: #007aff;
+  --apple-blue-hover: #0062cc;
+  --apple-blue-soft: rgba(0, 122, 255, 0.1);
+
+  --apple-green: #34c759;
+  --apple-green-soft: rgba(52, 199, 89, 0.12);
+
+  --apple-orange: #ff9500;
+  --apple-orange-soft: rgba(255, 149, 0, 0.12);
+
+  --apple-purple: #af52de;
+  --apple-purple-soft: rgba(175, 82, 222, 0.12);
+
+  --apple-red: #ff3b30;
+  --apple-red-soft: rgba(255, 59, 48, 0.12);
+
+  --apple-teal: #30b0c7;
+
+  /* 苹果文本色彩梯队 */
+  --apple-label: #1c1c1e;
+  --apple-secondary: #3a3a3c;
+  --apple-tertiary: #8e8e93;
+  --apple-quaternary: #aeaeb2;
+
+  /* 苹果 macOS System Background (Sonoma / iOS 17 暖灰底) */
+  --apple-bg: #f5f5f7;
+  --apple-card-bg: rgba(255, 255, 255, 0.82);
+  --apple-card-solid: #ffffff;
+  --apple-sidebar-bg: #f6f6f8;
+
+  /* 苹果微高光边框与毛玻璃 */
+  --apple-border: rgba(0, 0, 0, 0.06);
+  --apple-border-light: rgba(255, 255, 255, 0.8);
+  --apple-glass-backdrop: blur(25px) saturate(190%);
+
+  /* 苹果气泡阴影 (Apple Ambient Shadow) */
+  --apple-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --apple-shadow-md: 0 8px 24px -4px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+  --apple-shadow-lg: 0 16px 36px -6px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+
+  /* 苹果连续曲率圆角 (Apple Squircle Radius) */
+  --apple-radius-sm: 10px;
+  --apple-radius-md: 14px;
+  --apple-radius-lg: 18px;
+  --apple-radius-xl: 24px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--apple-bg);
+  color: var(--apple-label);
+  font-family: var(--font-apple);
+  font-size: 14px;
+  line-height: 1.47;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 苹果标准卡片 (Apple Vibrant Card) */
+.panel {
+  background: var(--apple-card-bg);
+  backdrop-filter: var(--apple-glass-backdrop);
+  -webkit-backdrop-filter: var(--apple-glass-backdrop);
+  border: 1px solid var(--apple-border);
+  box-shadow: var(--apple-shadow-sm);
+  border-radius: var(--apple-radius-md);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.panel:hover {
+  box-shadow: var(--apple-shadow-md);
+  border-color: rgba(0, 122, 255, 0.2);
+}
+
+/* 苹果风格表格 (Apple macOS Table) */
+.el-table {
+  --el-table-header-bg-color: rgba(245, 245, 247, 0.7) !important;
+  --el-table-header-text-color: #8e8e93 !important;
+  --el-table-border-color: rgba(0, 0, 0, 0.04) !important;
+  font-size: 13px !important;
+  border-radius: var(--apple-radius-md) !important;
+  background: transparent !important;
+}
+
+.el-table tr {
+  background: transparent !important;
+}
+
+.el-table th.el-table__cell {
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.02em !important;
+  height: 40px !important;
+}
+
+.el-table td.el-table__cell {
+  padding: 11px 0 !important;
+}
+
+/* 苹果按钮 (Apple Rounded Pills & Buttons) */
+.el-button--primary:not(.is-link):not(.is-text) {
+  --el-button-bg-color: var(--apple-blue) !important;
+  --el-button-border-color: var(--apple-blue) !important;
+  --el-button-hover-bg-color: var(--apple-blue-hover) !important;
+  --el-button-hover-border-color: var(--apple-blue-hover) !important;
+  font-weight: 600 !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 2px 6px rgba(0, 122, 255, 0.25) !important;
+  padding: 8px 18px !important;
+}
+
+.el-button:not(.is-link):not(.is-text) {
+  border-radius: 9999px !important;
+}
+
+/* 苹果风格表格操作链接 (Clean Apple Table Actions) */
+.el-table .el-button.is-link {
+  padding: 3px 8px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  border: none !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+  transition: all 0.18s ease !important;
+}
+
+.el-table .el-button.is-link.el-button--primary {
+  color: var(--apple-blue) !important;
+}
+
+.el-table .el-button.is-link.el-button--primary:hover {
+  background: rgba(0, 122, 255, 0.1) !important;
+}
+
+.el-table .el-button.is-link.el-button--danger {
+  color: var(--apple-red) !important;
+}
+
+.el-table .el-button.is-link.el-button--danger:hover {
+  background: rgba(255, 59, 48, 0.1) !important;
+}
+
+/* 苹果 Modal 风格 (macOS Sheet Modal) */
+.el-dialog {
+  border-radius: 22px !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(30px) saturate(200%) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  padding: 24px !important;
+}
+
+.el-dialog__header {
+  padding-bottom: 14px !important;
+  margin-right: 0 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.el-dialog__title {
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+  color: var(--apple-label) !important;
+}
