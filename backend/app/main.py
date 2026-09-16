@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api import router
+from .ai.router import router as ai_router
 from .config import get_settings
 from sqlalchemy import text
 
@@ -44,6 +45,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(router, prefix=settings.api_prefix)
+app.include_router(ai_router, prefix=settings.api_prefix)
 
 
 import os
@@ -67,6 +69,7 @@ def health():
             "table-tennis-workbench",
             "rope-skipping-workbench",
             "immutable-published-results",
+            "ai-copilot-platform",
         ],
     }
 

@@ -28,7 +28,7 @@ def run_alembic_upgrade(db_path: Path):
     cfg.set_main_option("sqlalchemy.url", url)
     command.upgrade(cfg, "head")
 
-def check_db(db_path: Path, expected_version="20260901_0009"):
+def check_db(db_path: Path, expected_version="20260916_0010"):
     conn = sqlite3.connect(str(db_path))
     cur = conn.cursor()
     version = cur.execute("SELECT version_num FROM alembic_version").fetchone()[0]

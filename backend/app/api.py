@@ -2198,7 +2198,7 @@ def initialize_rope_events(data: RopeInitializeRequest, actor: User = Depends(bu
 
 
 @router.get("/sports-teacher/rope/status")
-def rope_status(meet_id: int, _actor: User = Depends(manager_only), db: Session = Depends(get_db)):
+def rope_status(_actor: User = Depends(business_admin), meet_id: int = Query(...), db: Session = Depends(get_db)):
     meet = db.get(SportsMeet, meet_id)
     if not meet:
         raise HTTPException(404, "运动会不存在")

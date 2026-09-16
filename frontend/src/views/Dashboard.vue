@@ -5,16 +5,19 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Aim, Calendar, CirclePlus, DataAnalysis, Document, Download, EditPen, Fold, Grid, Lock,
   Menu as MenuIcon, Medal, Operation, Refresh, Search, Setting, SwitchButton, Tickets, Trophy, User,
-  UserFilled, UploadFilled, View, ArrowRight
+  UserFilled, UploadFilled, View, ArrowRight, ChatDotRound, Cpu
 } from '@element-plus/icons-vue'
 import api, { errorMessage } from '../api'
 import { useAuthStore } from '../stores/auth'
+import AiCenter from './ai/AiCenter.vue'
+import AiCopilotDrawer from './ai/AiCopilotDrawer.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
 const active = ref('overview')
 const collapsed = ref(false)
 const loading = ref(false)
+const aiDrawerVisible = ref(false)
 const summary = reactive<any>({})
 const settings = reactive<any>({ system_name: '校园运动会赛事成绩管理系统', short_name: '校园运动会', logo_text: '跃', primary_color: '#007aff', login_heading: '', results_page_name: '', footer: '' })
 const accounts = ref<any[]>([])
@@ -93,7 +96,7 @@ const pageTitle = computed(() => navItems.value.find(item => item.key === active
 const navItems = computed(() => {
   const base = [{ key: 'overview', label: role.value === 'STUDENT' ? '我的首页' : '系统概览', icon: Grid, color: 'blue' }]
   if (role.value === 'STUDENT') return [...base, { key: 'student-events', label: '我的赛事', icon: Calendar, color: 'orange' }, { key: 'student-results', label: '我的成绩', icon: Medal, color: 'purple' }]
-  if (role.value === 'DEVELOPER') base.push({ key: 'accounts', label: '账号管理', icon: UserFilled, color: 'blue' }, { key: 'settings', label: '系统配置', icon: Setting, color: 'gray' })
+  if (role.value === 'DEVELOPER') base.push({ key: 'accounts', label: '账号管理', icon: UserFilled, color: 'blue' }, { key: 'settings', label: '系统配置', icon: Setting, color: 'gray' }, { key: 'ai-center', label: 'AI 智能中心', icon: Cpu, color: 'purple' })
   if (['DEVELOPER','SPORTS_TEACHER'].includes(role.value)) base.push({ key: 'events', label: '赛事与项目', icon: Trophy, color: 'orange' }, { key: 'rosters', label: '名单录入', icon: User, color: 'teal' }, { key: 'basketball', label: '篮球赛制', icon: Aim, color: 'orange' }, { key: 'volleyball', label: '排球赛制', icon: Aim, color: 'purple' }, { key: 'table-tennis', label: '乒乓球赛制', icon: Medal, color: 'teal' }, { key: 'rope', label: '跳绳赛制', icon: Operation, color: 'green' }, { key: 'models', label: '计分模型', icon: DataAnalysis, color: 'purple' }, { key: 'permissions', label: '项目权限', icon: Lock, color: 'red' })
   else base.push({ key: 'my-events', label: '我的项目', icon: Aim, color: 'orange' }, { key: 'rope', label: '跳绳赛制', icon: Operation, color: 'green' })
   base.push({ key: 'schedules', label: '赛程管理', icon: Calendar, color: 'green' }, { key: 'results', label: '成绩工作台', icon: Tickets, color: 'blue' })
@@ -1677,6 +1680,9 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
           </div>
         </div>
         <div class="mac-bar-right">
+          <button class="mac-pill-btn ai-copilot-pill" @click="aiDrawerVisible = true">
+            <el-icon><ChatDotRound/></el-icon> AI 赛事协同
+          </button>
           <button class="mac-pill-btn" @click="router.push('/results')">
             <el-icon><View/></el-icon> 实时成绩大屏
           </button>
@@ -3171,8 +3177,32 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
             </el-table>
           </section>
         </template>
+
+        <!-- 14. AI 智能中心 -->
+        <template v-else-if="active === 'ai-center'">
+          <AiCenter />
+        </template>
       </div>
     </main>
+
+    <!-- Global AI Copilot Drawer -->
+    <AiCopilotDrawer
+      v-model="aiDrawerVisible"
+      :current-meet-id="selectedMeetId"
+      :current-event-id="selectedEventId"
+      :current-page="active"
+    />
+
+    <!-- Global Floating AI Copilot Trigger -->
+    <button
+      class="apple-ai-floating-fab"
+      @click="aiDrawerVisible = true"
+      title="唤起 AI 赛事协同助手"
+    >
+      <div class="fab-pulse"></div>
+      <el-icon><ChatDotRound/></el-icon>
+      <span class="fab-label">AI 协同</span>
+    </button>
 
     <!-- macOS 风格 Sheet Modals -->
     <el-dialog v-model="accountDialog" :title="accountEditingId ? '编辑账号' : '创建新账号'" width="520px">
@@ -4617,5 +4647,64 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
   .mac-app-info, .mac-section-title, .mac-nav-label, .mac-user-meta {
     display: none;
   }
+}
+
+/* AI Copilot 顶栏按钮与悬浮球 */
+.mac-pill-btn.ai-copilot-pill {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.12) 0%, rgba(88, 86, 214, 0.15) 100%);
+  border-color: rgba(88, 86, 214, 0.3);
+  color: #5856d6;
+  font-weight: 700;
+}
+
+.mac-pill-btn.ai-copilot-pill:hover {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.2) 0%, rgba(88, 86, 214, 0.25) 100%);
+}
+
+.apple-ai-floating-fab {
+  position: fixed;
+  bottom: 28px;
+  right: 32px;
+  height: 48px;
+  padding: 0 18px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #007aff 0%, #5856d6 100%);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 8px 24px rgba(88, 86, 214, 0.35);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1000;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.apple-ai-floating-fab:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 12px 30px rgba(88, 86, 214, 0.45);
+}
+
+.fab-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.fab-pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 9999px;
+  box-shadow: 0 0 0 0 rgba(88, 86, 214, 0.6);
+  animation: fab-ripple 2.5s infinite;
+}
+
+@keyframes fab-ripple {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(88, 86, 214, 0.5); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 14px rgba(88, 86, 214, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(88, 86, 214, 0); }
 }
 </style>
