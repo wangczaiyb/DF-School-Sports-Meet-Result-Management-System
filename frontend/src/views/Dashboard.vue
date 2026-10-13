@@ -11,6 +11,7 @@ import api, { errorMessage } from '../api'
 import { useAuthStore } from '../stores/auth'
 import AiCenter from './ai/AiCenter.vue'
 import AiCopilotDrawer from './ai/AiCopilotDrawer.vue'
+import RopeTableTools from './RopeTableTools.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -19,7 +20,7 @@ const collapsed = ref(false)
 const loading = ref(false)
 const aiDrawerVisible = ref(false)
 const summary = reactive<any>({})
-const settings = reactive<any>({ system_name: '校园运动会赛事成绩管理系统', short_name: '校园运动会', logo_text: '跃', primary_color: '#007aff', login_heading: '', results_page_name: '', footer: '' })
+const settings = reactive<any>({ system_name: '校园运动会赛事成绩管理系统', short_name: '校园运动会赛事成绩管理系统', logo_text: '跃', primary_color: '#007aff', login_heading: '', results_page_name: '', footer: '' })
 const accounts = ref<any[]>([])
 const quotas = reactive<any>({})
 const meets = ref<any[]>([])
@@ -34,6 +35,7 @@ const results = ref<any[]>([])
 const registrations = ref<any[]>([])
 const rounds = ref<any[]>([])
 const students = ref<any[]>([])
+const rosterImporting = ref(false)
 const collegeTeams = ref<any[]>([])
 const eventRosterItems = ref<any[]>([])
 const eventRosterCandidates = ref<any[]>([])
@@ -92,7 +94,7 @@ const role = computed(() => auth.user?.role || '')
 const roleLabel: Record<string,string> = { DEVELOPER: '开发人员', SPORTS_TEACHER: '体育部老师', REFEREE: '裁判员', SCORER: '计分员', REFEREE_SCORER: '裁判兼计分员', STUDENT: '学生' }
 const pageTitle = computed(() => navItems.value.find(item => item.key === active.value)?.label || '系统概览')
 
-// 为苹果 SF 风格配色分配不同组件背景
+// 为不同组件分配主题背景色
 const navItems = computed(() => {
   const base = [{ key: 'overview', label: role.value === 'STUDENT' ? '我的首页' : '系统概览', icon: Grid, color: 'blue' }]
   if (role.value === 'STUDENT') return [...base, { key: 'student-events', label: '我的赛事', icon: Calendar, color: 'orange' }, { key: 'student-results', label: '我的成绩', icon: Medal, color: 'purple' }]
@@ -1175,14 +1177,12 @@ const eventsForTeamMeet = computed(() => {
 })
 
 const distinctColleges = computed(() => {
-  const set = new Set<string>()
-  students.value.forEach((s: any) => {
-    if (s.college && s.college.trim()) set.add(s.college.trim())
-  })
-  if (!set.size) {
-    ;['计算机学院', '软件学院', '信息学院', '商学院', '外国语学院', '理学院', '体育学院', '机械工程学院'].forEach((c) => set.add(c))
-  }
-  return Array.from(set)
+  const defaults = ['信息工程学院', '机电工程学院', '外国语学院', '食品工程学院', '艺术设计学院', '建筑工程学院', '人文学院']
+  try {
+    const configured = JSON.parse(settings.participating_colleges || 'null')
+    if (Array.isArray(configured) && configured.every((college: any) => typeof college === 'string')) return configured
+  } catch { /* 使用学校默认学院 */ }
+  return defaults
 })
 
 const filteredCollegeTeams = computed(() => {
@@ -1228,10 +1228,10 @@ async function loadRosterData() {
 
 function openCreateAccount(){accountEditingId.value=null;Object.assign(accountForm,{username:'',display_name:'',password:'',role:'SCORER',department:'体育部',employee_no:'',phone:''});accountDialog.value=true}
 function openEditAccount(row:any){accountEditingId.value=row.id;Object.assign(accountForm,{username:row.username,display_name:row.display_name,password:'',role:row.role,department:row.department||'',employee_no:row.employee_no||'',phone:row.phone||''});accountDialog.value=true}
-async function saveAccount() { try { const payload={...accountForm};if(!payload.password)delete payload.password;if(accountEditingId.value)await api.put(`/developer/accounts/${accountEditingId.value}`,payload);else await api.post('/developer/accounts',payload);ElMessage.success(accountEditingId.value?'账号修改成功':'账号创建成功');accountDialog.value=false;loadActive() } catch(e){ElMessage.error(errorMessage(e))} }
+async function saveAccount() { try { const payload={...accountForm};if(!accountEditingId.value&&payload.role==='STUDENT')payload.password=`DF${payload.username}`;if(!payload.password)delete payload.password;if(accountEditingId.value)await api.put(`/developer/accounts/${accountEditingId.value}`,payload);else await api.post('/developer/accounts',payload);ElMessage.success(accountEditingId.value?'账号修改成功':'账号创建成功');accountDialog.value=false;loadActive() } catch(e){ElMessage.error(errorMessage(e))} }
 async function toggleFreeze(row:any) { try { if(row.status==='ACTIVE'){ const {value}=await ElMessageBox.prompt('请填写冻结原因','冻结账号',{inputPlaceholder:'例如：岗位调整'});await api.post(`/developer/accounts/${row.id}/freeze`,{reason:value}) } else await api.post(`/developer/accounts/${row.id}/unfreeze`);ElMessage.success('账号状态已更新');loadActive() } catch(e:any){if(e!=='cancel')ElMessage.error(errorMessage(e))} }
 async function forceLogout(row:any) { try { await api.post(`/developer/accounts/${row.id}/force-logout`);ElMessage.success('已强制退出') } catch(e){ElMessage.error(errorMessage(e))} }
-async function resetAccountPassword(row:any){try{if(row.role==='STUDENT'){await ElMessageBox.confirm('恢复为 DF + 学号后6位。','重置密码');await api.post(`/developer/accounts/${row.id}/reset-password`,{})}else{const {value}=await ElMessageBox.prompt('输入至少8位新密码','重置密码',{inputType:'password',inputValidator:(v)=>v.length>=8||'密码至少8位'});await api.post(`/developer/accounts/${row.id}/reset-password`,{password:value})}ElMessage.success('密码已重置')}catch(e:any){if(e!=='cancel')ElMessage.error(errorMessage(e))}}
+async function resetAccountPassword(row:any){try{if(row.role==='STUDENT'){await ElMessageBox.confirm('恢复为 DF + 完整学号。','重置密码');await api.post(`/developer/accounts/${row.id}/reset-password`,{})}else{const {value}=await ElMessageBox.prompt('输入至少8位新密码','重置密码',{inputType:'password',inputValidator:(v)=>v.length>=8||'密码至少8位'});await api.post(`/developer/accounts/${row.id}/reset-password`,{password:value})}ElMessage.success('密码已重置')}catch(e:any){if(e!=='cancel')ElMessage.error(errorMessage(e))}}
 async function saveSettings() { try { const values={system_name:settings.system_name,short_name:settings.short_name,logo_text:settings.logo_text,primary_color:settings.primary_color,login_heading:settings.login_heading,results_page_name:settings.results_page_name,footer:settings.footer};await api.put('/developer/settings',{values});ElMessage.success('系统配置已保存') } catch(e){ElMessage.error(errorMessage(e))} }
 function openMeetEditor(row?:any){const editing=!!row?.id;meetEditingId.value=editing?row.id:null;Object.assign(meetForm,editing?{name:row.name,edition:row.edition,start_date:row.start_date,end_date:row.end_date,status:row.status,public_visible:row.public_visible}:{name:'',edition:String(new Date().getFullYear()),start_date:'',end_date:'',status:'PREPARING',public_visible:true});meetDialog.value=true}
 async function saveMeet() {
@@ -1275,8 +1275,38 @@ async function saveEvent() {
   }
 }
 async function deleteEvent(row:any){try{await ElMessageBox.confirm(`确定删除项目“${row.name}”吗？`,'删除比赛项目',{type:'warning'});await api.delete(`/sports-teacher/events/${row.id}`);ElMessage.success('已删除');loadActive()}catch(e:any){if(e!=='cancel')ElMessage.error(errorMessage(e))}}
-async function importRoster(options:any){const formData=new FormData();formData.append('file',options.file);try{const {data}=await api.post('/sports-teacher/students/import',formData,{headers:{'Content-Type':'multipart/form-data'}});ElMessage.success(`导入完成：新增 ${data.created} 人`);options.onSuccess(data);if(active.value==='rosters')await loadRosterData()}catch(e){ElMessage.error(errorMessage(e));options.onError(e)}}
-async function downloadRosterTemplate(){try{const response=await api.get('/sports-teacher/students/template',{responseType:'blob'});const url=URL.createObjectURL(response.data);const a=document.createElement('a');a.href=url;a.download='学生参赛名单模板.xlsx';a.click();URL.revokeObjectURL(url)}catch(e){ElMessage.error(errorMessage(e))}}
+async function importRoster(options:any) {
+  if (rosterImporting.value) return
+  rosterImporting.value = true
+  const formData = new FormData()
+  formData.append('file', options.file)
+  const endpoint = role.value === 'DEVELOPER' ? '/developer/students/import' : '/sports-teacher/students/import'
+  try {
+    const { data } = await api.post(endpoint, formData, { timeout: role.value === 'DEVELOPER' ? 0 : 15000 })
+    ElMessage.success(role.value === 'DEVELOPER'
+      ? `新增资料 ${data.created} 人，注册账号 ${data.registered} 个，跳过已注册或重复记录 ${data.skipped} 条`
+      : `导入完成：新增 ${data.created} 人，跳过 ${data.skipped} 条`)
+    options.onSuccess(data)
+    await loadActive()
+  } catch(e) {
+    ElMessage.error(errorMessage(e))
+    options.onError(e)
+  } finally {
+    rosterImporting.value = false
+  }
+}
+async function downloadRosterTemplate() {
+  try {
+    const endpoint = role.value === 'DEVELOPER' ? '/developer/students/template' : '/sports-teacher/students/template'
+    const response = await api.get(endpoint, { responseType: 'blob' })
+    const url = URL.createObjectURL(response.data)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = role.value === 'DEVELOPER' ? '学生账号花名册模板.xlsx' : '学生参赛名单模板.xlsx'
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch(e) { ElMessage.error(errorMessage(e)) }
+}
 function openStudentRoster(row?:any){const editing=!!row?.id;studentRosterEditingId.value=editing?row.id:null;Object.assign(studentRosterForm,editing?{student_no:row.student_no,name:row.name,gender:row.gender,college:row.college,major:row.major,class_name:row.class_name}:{student_no:'',name:'',gender:'男',college:'',major:'',class_name:''});studentRosterDialog.value=true}
 async function saveStudentRoster(){
   if (!studentRosterForm.student_no || !studentRosterForm.name || !studentRosterForm.college || !studentRosterForm.major || !studentRosterForm.class_name) return ElMessage.warning('请完整填写学号、姓名、学院、专业和班级')
@@ -1411,15 +1441,24 @@ const ropeLineupTeam = ref<any>(null)
 const ropeLineupForm = reactive<any>({ event_id: null, college_team_id: null, jumper_ids: [], turner_ids: [] })
 const selectedRopeEvent = computed(() => ropeData.events.find((event: any) => event.id === ropeEventId.value) || ropeData.events[0] || null)
 const ropeLineupMembers = computed(() => ropeLineupTeam.value?.members || [])
+const ropeEntryJumpers = computed(() => {
+  const team = ropeData.events.find((event: any) => event.id === resultForm.event_id)?.teams.find((item: any) => item.registration_id === resultForm.registration_id)
+  return (team?.lineup || []).filter((member: any) => member.role === 'JUMPER')
+    .sort((a: any, b: any) => Number(a.gender !== '男') - Number(b.gender !== '男') || a.sequence - b.sequence)
+})
 
 async function loadRopeData() {
   await ensureEvents()
+  if (!canCreateBusiness.value) {
+    meets.value = (await api.get('/admin/rope/meets')).data
+    if (!meets.value.some((meet: any) => meet.id === selectedMeetId.value)) selectedMeetId.value = meets.value[0]?.id || null
+  }
   if (!selectedMeetId.value && meets.value.length) selectedMeetId.value = meets.value[0].id
   if (!selectedMeetId.value) {
     Object.assign(ropeData, { meet: null, events: [] })
     return
   }
-  const { data } = await api.get('/sports-teacher/rope/status', { params: { meet_id: selectedMeetId.value } })
+  const { data } = await api.get(canCreateBusiness.value ? '/sports-teacher/rope/status' : '/admin/rope/status', { params: { meet_id: selectedMeetId.value } })
   Object.assign(ropeData, data)
   if (!ropeEventId.value || !data.events.some((event: any) => event.id === ropeEventId.value)) {
     ropeEventId.value = data.events[0]?.id || null
@@ -1539,7 +1578,7 @@ function openResultEntry(row?:any){
   Object.assign(resultForm,editing?{event_id:row.event_id,round_id:row.round_id,registration_id:row.registration_id,raw_value:row.raw_value,competition_status:row.competition_status,notes:row.notes||'',modification_reason:'',published_at:row.published_at}:{event_id:selectedEventId.value,round_id:selectedResultRoundId.value||rounds.value[0]?.id||null,registration_id:null,raw_value:null,competition_status:'NORMAL',notes:'',modification_reason:'',published_at:null});
   
   // 检查是否属于跳绳项目
-  const ev = events.value.find((e: any) => e.id === (row?.event_id || selectedEventId.value))
+  const ev = availableEvents.value.find((e: any) => e.id === (row?.event_id || selectedEventId.value))
   ropeHelper.isRopeSingle = !!ev && (ev.code === 'ROPE_SINGLE' || ev.name.includes('前单跳'))
   ropeHelper.isRopeSync = !!ev && (ev.code === 'ROPE_SYNC' || ev.name.includes('集体单摇'))
   ropeHelper.isRopeFig8 = !!ev && (ev.code === 'ROPE_FIG8' || ev.name.includes('8') || ev.name.includes('环绕'))
@@ -1621,9 +1660,9 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
 
 <template>
   <div class="apple-workspace">
-    <!-- macOS Sonoma 风格高透毛玻璃侧边栏 -->
+    <!-- 高透毛玻璃侧边栏 -->
     <aside :class="['mac-sidebar', { collapsed }]">
-      <!-- 苹果 macOS 窗口红黄绿三色控制点 (Traffic Lights) -->
+      <!-- 窗口红黄绿三色控制点 -->
       <div class="mac-window-controls">
         <span class="mac-dot red"></span>
         <span class="mac-dot yellow"></span>
@@ -1653,7 +1692,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
         </button>
       </nav>
 
-      <!-- 苹果账户质感底部栏 -->
+      <!-- 账户信息底部栏 -->
       <div class="mac-user-card" v-if="!collapsed">
         <div class="mac-user-avatar">{{ auth.user?.display_name?.slice(0,1) }}</div>
         <div class="mac-user-meta">
@@ -1666,9 +1705,9 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
       </div>
     </aside>
 
-    <!-- macOS 风格主页面结构 -->
+    <!-- 主页面结构 -->
     <main class="mac-main-area">
-      <!-- 苹果 iOS / macOS 悬浮顶栏 -->
+      <!-- 悬浮顶栏 -->
       <header class="mac-top-bar">
         <div class="mac-bar-left">
           <button class="mac-toggle-btn" @click="collapsed = !collapsed">
@@ -1692,17 +1731,17 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
 
       <!-- 工作区正文区域 -->
       <div class="mac-body" v-loading="loading">
-        <!-- 1. Apple Health/Sports Bento 风格概览页 (Overview) -->
+        <!-- 1. 赛事概览页 -->
         <template v-if="active === 'overview'">
           <!-- 亲切富有活力的 Hello Banner -->
           <section class="apple-hello-banner">
             <div>
               <h1>Hello, {{ studentProfile.name || auth.user?.display_name }}</h1>
-              <p>{{ role === 'STUDENT' ? `${studentProfile.college || ''} · ${studentProfile.class_name || ''}` : '欢迎进入校园运动会赛事管理系统 · 全流程数据实时审核' }}</p>
+              <p>{{ role === 'STUDENT' ? `${studentProfile.college || ''} · ${studentProfile.class_name || ''}` : '欢迎进入校园运动会赛事成绩管理系统 · 全流程数据实时审核' }}</p>
             </div>
           </section>
 
-          <!-- 苹果 Activity 风格 4 列 Vibrant Bento 统计卡片 -->
+          <!-- 四列统计卡片 -->
           <section class="apple-bento-grid">
             <template v-if="role === 'STUDENT'">
               <article class="apple-bento-card panel blue">
@@ -1814,8 +1853,15 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
           <section class="mac-card panel">
             <div class="mac-card-head">
               <div><h3>全部账号管理</h3><p>系统账号支持一键冻结与强制下线保护</p></div>
-              <el-button type="primary" :icon="CirclePlus" @click="openCreateAccount">创建新账号</el-button>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <el-button :icon="Download" @click="downloadRosterTemplate">花名册模板</el-button>
+                <el-upload action="#" :show-file-list="false" :http-request="importRoster" :disabled="rosterImporting" accept=".xlsx">
+                  <el-button :icon="UploadFilled" :loading="rosterImporting">批量注册学生</el-button>
+                </el-upload>
+                <el-button type="primary" :icon="CirclePlus" @click="openCreateAccount">创建新账号</el-button>
+              </div>
             </div>
+            <p>花名册至少填写学号、姓名；学生以学号登录，初始密码为 DF + 完整学号。</p>
             <el-table :data="accounts">
               <el-table-column prop="username" label="用户名" min-width="140"/>
               <el-table-column prop="display_name" label="姓名" width="120"/>
@@ -1907,17 +1953,21 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
                   <div style="display:flex;gap:8px">
                     <el-button type="primary" :icon="CirclePlus" @click="openStudentRoster()">新增学生</el-button>
                     <el-button :icon="Download" @click="downloadRosterTemplate">下载模板</el-button>
-                    <el-upload action="#" :show-file-list="false" :http-request="importRoster" accept=".xlsx" style="display:inline-block">
-                      <el-button :icon="UploadFilled">批量导入</el-button>
+                    <el-upload action="#" :show-file-list="false" :http-request="importRoster" :disabled="rosterImporting" accept=".xlsx" style="display:inline-block">
+                      <el-button :icon="UploadFilled" :loading="rosterImporting">{{ role === 'DEVELOPER' ? '导入并注册账号' : '批量导入' }}</el-button>
                     </el-upload>
                   </div>
                 </div>
+                <p v-if="role === 'DEVELOPER'">至少填写学号、姓名即可注册账号；初始密码为 DF + 完整学号。性别、学院、专业、班级可随后补充。</p>
                 <el-table :data="students">
                   <el-table-column prop="student_no" label="学号" width="140"/>
                   <el-table-column prop="name" label="姓名" width="120"/>
                   <el-table-column prop="gender" label="性别" width="80"/>
                   <el-table-column prop="college" label="学院" min-width="160"/>
                   <el-table-column prop="class_name" label="班级" min-width="140"/>
+                  <el-table-column label="账号状态" width="110">
+                    <template #default="s"><el-tag :type="s.row.activated ? 'success' : 'info'">{{ s.row.activated ? '已注册' : '待注册' }}</el-tag></template>
+                  </el-table-column>
                   <el-table-column label="操作" width="140" fixed="right">
                     <template #default="s">
                       <el-button link type="primary" @click="openStudentRoster(s.row)">编辑</el-button>
@@ -2892,6 +2942,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
 
         <!-- 9. 跳绳团体赛制 -->
         <template v-else-if="active === 'rope'">
+          <RopeTableTools :key="selectedMeetId || 0" :meet-id="selectedMeetId" :event-id="ropeEventId" :events="ropeData.events" :can-manage="canCreateBusiness" @changed="loadRopeData"/>
           <!-- 竞赛规程总览 (三项并列卡片) -->
           <section class="mac-card panel" style="margin-bottom:14px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -3185,7 +3236,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
       </div>
     </main>
 
-    <!-- Global AI Copilot Drawer -->
+    <!-- 全局 AI 赛事协同抽屉 -->
     <AiCopilotDrawer
       v-model="aiDrawerVisible"
       :current-meet-id="selectedMeetId"
@@ -3193,7 +3244,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
       :current-page="active"
     />
 
-    <!-- Global Floating AI Copilot Trigger -->
+    <!-- 全局 AI 赛事协同悬浮按钮 -->
     <button
       class="apple-ai-floating-fab"
       @click="aiDrawerVisible = true"
@@ -3204,12 +3255,13 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
       <span class="fab-label">AI 协同</span>
     </button>
 
-    <!-- macOS 风格 Sheet Modals -->
+    <!-- 业务表单弹窗 -->
     <el-dialog v-model="accountDialog" :title="accountEditingId ? '编辑账号' : '创建新账号'" width="520px">
       <el-form label-position="top" class="apple-dialog-form">
         <el-form-item label="用户名"><el-input v-model="accountForm.username" :disabled="!!accountEditingId"/></el-form-item>
         <el-form-item label="姓名"><el-input v-model="accountForm.display_name"/></el-form-item>
-        <el-form-item label="密码"><el-input v-model="accountForm.password" type="password" show-password/></el-form-item>
+        <el-form-item v-if="!accountEditingId && accountForm.role === 'STUDENT'" label="初始密码"><el-input :model-value="`DF${accountForm.username}`" disabled/></el-form-item>
+        <el-form-item v-else label="密码"><el-input v-model="accountForm.password" type="password" show-password/></el-form-item>
         <el-form-item label="角色"><el-select v-model="accountForm.role"><el-option v-for="(lbl, key) in roleLabel" :key="key" :label="lbl" :value="key"/></el-select></el-form-item>
         <el-form-item label="部门"><el-input v-model="accountForm.department"/></el-form-item>
         <div v-if="accountForm.role !== 'DEVELOPER' && accountForm.role !== 'STUDENT'" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -3386,7 +3438,10 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
           <div style="margin-bottom:10px">
             <div style="font-size:12px;font-weight:600;color:#1c1c1e;margin-bottom:4px">🔵 男生组（5人）：</div>
             <div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:6px">
-              <el-input-number v-for="i in 5" :key="'m'+i" v-model="ropeHelper.maleScores[i-1]" :min="0" :max="500" :controls="false" size="small" :placeholder="`男${i}`"/>
+              <div v-for="i in 5" :key="'m'+i">
+                <div style="font-size:11px;margin-bottom:4px" :title="ropeEntryJumpers[i-1]?.student_no">男{{ i }} · {{ ropeEntryJumpers[i-1]?.name || '待选择队伍' }}</div>
+                <el-input-number v-model="ropeHelper.maleScores[i-1]" :min="0" :max="500" :controls="false" size="small" :placeholder="`男${i}`" style="width:100%"/>
+              </div>
             </div>
           </div>
 
@@ -3394,7 +3449,10 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
           <div style="margin-bottom:12px">
             <div style="font-size:12px;font-weight:600;color:#1c1c1e;margin-bottom:4px">🔴 女生组（5人）：</div>
             <div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:6px">
-              <el-input-number v-for="i in 5" :key="'f'+i" v-model="ropeHelper.femaleScores[i-1]" :min="0" :max="500" :controls="false" size="small" :placeholder="`女${i}`"/>
+              <div v-for="i in 5" :key="'f'+i">
+                <div style="font-size:11px;margin-bottom:4px" :title="ropeEntryJumpers[i+4]?.student_no">女{{ i }} · {{ ropeEntryJumpers[i+4]?.name || '待选择队伍' }}</div>
+                <el-input-number v-model="ropeHelper.femaleScores[i-1]" :min="0" :max="500" :controls="false" size="small" :placeholder="`女${i}`" style="width:100%"/>
+              </div>
             </div>
           </div>
 
@@ -4009,7 +4067,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
 </template>
 
 <style scoped>
-/* 苹果系统 Workspace 外壳 */
+/* 工作台布局 */
 .apple-workspace {
   display: flex;
   min-height: 100vh;
@@ -4018,7 +4076,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif;
 }
 
-/* macOS Sonoma 风格高透毛玻璃侧边栏 */
+/* 高透毛玻璃侧边栏 */
 .mac-sidebar {
   width: 240px;
   background: rgba(246, 246, 248, 0.82);
@@ -4038,7 +4096,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
   width: 72px;
 }
 
-/* 标志性 macOS 窗口红黄绿三色控灯 */
+/* 窗口红黄绿三色指示灯 */
 .mac-window-controls {
   display: flex;
   align-items: center;
@@ -4056,7 +4114,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
 .mac-dot.yellow { background-color: #febc2e; border: 0.5px solid #dea123; }
 .mac-dot.green { background-color: #28c840; border: 0.5px solid #1aab29; }
 
-/* 苹果 App Header Icon */
+/* 顶部图标 */
 .mac-brand {
   display: flex;
   align-items: center;
@@ -4151,7 +4209,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
   color: #ffffff !important;
 }
 
-/* 苹果 SF Symbols 彩色 Icon 块 */
+/* 彩色图标块 */
 .sf-icon-box {
   width: 26px;
   height: 26px;
@@ -4175,7 +4233,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
   white-space: nowrap;
 }
 
-/* 苹果用户卡片底部 */
+/* 用户卡片底部 */
 .mac-user-card {
   display: flex;
   align-items: center;
@@ -4246,7 +4304,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
   width: calc(100% - 72px);
 }
 
-/* 苹果 iOS / macOS 顶栏 Header */
+/* 页面顶栏 */
 .mac-top-bar {
   height: 60px;
   padding: 0 28px;
@@ -4330,7 +4388,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
   width: 100%;
 }
 
-/* Apple 亲切 Hello Banner */
+/* 欢迎横幅 */
 .apple-hello-banner {
   margin-bottom: 20px;
 }
@@ -4349,7 +4407,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
   color: #8e8e93;
 }
 
-/* 苹果 Activity 风格 4 列 Vibrant Bento 统计卡片 */
+/* 四列统计卡片 */
 .apple-bento-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -4649,7 +4707,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
   }
 }
 
-/* AI Copilot 顶栏按钮与悬浮球 */
+/* AI 赛事协同顶栏按钮与悬浮球 */
 .mac-pill-btn.ai-copilot-pill {
   background: linear-gradient(135deg, rgba(0, 122, 255, 0.12) 0%, rgba(88, 86, 214, 0.15) 100%);
   border-color: rgba(88, 86, 214, 0.3);

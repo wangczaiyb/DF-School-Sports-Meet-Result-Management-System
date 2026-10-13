@@ -1,14 +1,12 @@
 @echo off
-title Campus Sports Meet System - Start
-cd /d "%~dp0"
-set "SPORTS_MEET_NO_BROWSER=1"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-local.ps1"
-if errorlevel 1 (
-    echo.
-    echo Startup failed. See the message above or logs in the data folder.
-    pause
-    exit /b 1
+chcp 65001 >nul
+setlocal
+title Campus Sports Meet
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start-local.ps1" %*
+set "launch_result=%errorlevel%"
+if not "%launch_result%"=="0" (
+  echo.
+  echo Startup failed. Please check the error above.
+  if /I not "%~1"=="-Check" pause
 )
-if /i "%~1"=="--no-browser" exit /b 0
-start "" "http://127.0.0.1:5173"
-exit /b 0
+exit /b %launch_result%

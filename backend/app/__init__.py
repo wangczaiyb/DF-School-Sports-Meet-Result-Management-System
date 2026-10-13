@@ -1,2 +1,2 @@
-"""Campus sports meet management backend."""
+"""校园运动会赛事成绩管理系统后端。"""
 

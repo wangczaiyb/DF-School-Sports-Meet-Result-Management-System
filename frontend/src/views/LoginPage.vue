@@ -14,7 +14,7 @@ const capsLock = ref(false)
 const registerVisible = ref(false)
 const settings = reactive({
   system_name: '校园运动会赛事成绩管理系统',
-  short_name: '校园运动会',
+  short_name: '校园运动会赛事成绩管理系统',
   login_heading: '让每一次冲刺，都被准确记录',
   login_subtitle: '赛事编排、成绩审核与荣誉发布，一站式协同完成',
   primary_color: '#246BFD',
@@ -34,7 +34,7 @@ function selectRole(kind: LoginKind) {
   form.kind = kind
   if (kind === 'developer') Object.assign(form, { username: 'developer01', password: 'Dev123456!' })
   if (kind === 'admin') Object.assign(form, { username: 'admin0001', password: 'Admin123456!' })
-  if (kind === 'student') Object.assign(form, { username: '2026001001', password: 'DF001001' })
+  if (kind === 'student') Object.assign(form, { username: '2026001001', password: 'DF2026001001' })
 }
 
 async function submit() {
@@ -58,14 +58,14 @@ async function registerStudent() {
     registerVisible.value = false
     selectRole('student')
     form.username = registerForm.student_no
-    form.password = `DF${registerForm.student_no.slice(-6)}`
+    form.password = `DF${registerForm.student_no}`
   } catch (error) {
     ElMessage.error(errorMessage(error))
   }
 }
 
 function forgotPassword() {
-  ElMessage.info(form.kind === 'student' ? '请联系体育部老师重置密码，重置后为 DF + 学号后6位。' : '请联系系统开发人员或有账号管理权限的负责人重置密码。')
+  ElMessage.info(form.kind === 'student' ? '请联系开发人员重置密码，默认重置后为 DF + 完整学号。' : '请联系系统开发人员或有账号管理权限的负责人重置密码。')
 }
 
 onMounted(async () => {
@@ -162,11 +162,11 @@ onMounted(async () => {
 
       <header class="brand-header">
         <div class="brand-mark">{{ settings.logo_text }}</div>
-        <div><strong>{{ settings.short_name }}</strong><span>SPORTS MEET</span></div>
+        <div><strong>{{ settings.short_name }}</strong><span>赛事管理</span></div>
       </header>
 
       <div class="brand-copy">
-        <div class="brand-kicker"><span class="kicker-pulse"></span> CAMPUS ATHLETICS LIVE</div>
+        <div class="brand-kicker"><span class="kicker-pulse"></span> 赛事动态</div>
         <h1 class="art-title">{{ settings.login_heading }}</h1>
         <p>{{ settings.login_subtitle }}</p>
         <div class="flow-strip">

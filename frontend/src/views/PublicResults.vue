@@ -24,7 +24,7 @@ const chartEl = ref<HTMLElement>()
 let chart: echarts.ECharts | null = null
 let pollTimer: number | undefined
 const filters = reactive({ gender: '', stage: '', college: '' })
-const settings = reactive({ results_page_name: '赛事成绩中心', short_name: '校园运动会', logo_text: '跃', footer: '校园运动会赛事组委会 · 数据以终审发布为准' })
+const settings = reactive({ results_page_name: '赛事成绩中心', short_name: '校园运动会赛事成绩管理系统', logo_text: '跃', footer: '校园运动会赛事组委会 · 数据以终审发布为准' })
 const stageLabel: Record<string,string> = { HEAT: '初赛', SEMIFINAL: '晋级赛', FINAL: '决赛' }
 const competitionStatusLabel: Record<string,string> = { NORMAL: '正常完赛', DNS: '未出赛', DNF: '未完赛', DQ: '取消资格', NM: '无有效成绩' }
 
@@ -144,7 +144,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); chart?.dispose(
 
 <template>
   <main class="results-page" v-loading="loading">
-    <!-- 苹果 Live 风格顶栏 -->
+    <!-- 实时成绩顶栏 -->
     <header class="topbar">
       <div class="public-brand">
         <div class="brand-mark">{{ settings.logo_text }}</div>
@@ -157,7 +157,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); chart?.dispose(
       <button class="login-link" @click="router.push('/login')"><el-icon><ArrowLeft /></el-icon> 返回登录</button>
     </header>
 
-    <!-- Apple TV Sports Live 巨幕 Header -->
+    <!-- 实时成绩主视图 -->
     <section class="hero">
       <div class="hero-aurora"></div>
       <div class="hero-content">
@@ -651,7 +651,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); chart?.dispose(
   transform: translateY(-1px);
 }
 
-/* 巨幕 Hero (Apple TV Live Sports Mesh) */
+/* 主视图背景 */
 .hero {
   min-height: 320px;
   position: relative;

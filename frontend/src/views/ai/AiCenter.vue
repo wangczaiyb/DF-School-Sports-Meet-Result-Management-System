@@ -230,7 +230,7 @@ onMounted(() => {
 
 <template>
   <div class="ai-center-workspace">
-    <!-- Apple SF 顶栏 Tab 导航 -->
+    <!-- 顶部标签导航 -->
     <div class="apple-tab-bar">
       <div class="tab-pill-group">
         <button

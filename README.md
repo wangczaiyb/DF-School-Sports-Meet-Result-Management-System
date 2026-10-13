@@ -20,46 +20,55 @@
 ## 目录结构
 
 ```text
-backend/                 FastAPI、SQLAlchemy、Alembic、pytest
+backend/                 FastAPI、SQLAlchemy、Alembic
 frontend/                Vue 3、TypeScript、Element Plus、Pinia、ECharts
 data/                    SQLite 数据库、导出和备份
 deploy/                  Nginx 服务器配置示例
 docs/                    原型评审、截图和测试报告
 outputs/sports-meet/     学生名单导入模板
-scripts/                 运维脚本
-start-local.ps1          Windows 一键启动
-stop-local.ps1           Windows 一键停止
+scripts/                 数据备份与恢复脚本
+main.py                  可直接运行的 Python 入口
+tests/                   业务、前端与数据库迁移测试
 ```
 
-## 一键启动
+## 从源码运行
 
-Windows 用户可直接双击项目根目录的 **`一键启动.bat`**。脚本会使用本机 Python 启动后端、使用 Node.js 启动前端，安装缺少的项目依赖，等待服务就绪后自动打开浏览器。全程不需要 Docker，也不需要另行安装数据库。需要停止时双击 **`一键停止.bat`**。
+运行环境：Python 3.12 或更高版本；需要重新构建前端时使用 Node.js 22 或更高版本。当前目录保留源码、运行配置、现有依赖与业务数据。
 
-### 运行环境
+### 一键启动
 
-- Python 3.12 或更高版本
-- Node.js 22 或更高版本
-- 不需要 Docker、MySQL、SQL Server 等数据库软件
+双击项目外层 `D:\运动会成绩系统\一键启动.bat`，或本项目内的 `一键启动.bat`。程序自动选择Python环境，检查依赖，启动后台，并在服务就绪后打开浏览器；前端源码有更新时会自动重新构建。请保留启动窗口，停止系统时按 `Ctrl+C`。
 
-也可以在项目根目录手动运行一键脚本：
+默认访问地址为 <http://127.0.0.1:8000>。重复启动会复用已运行且包含当前跳绳表格功能的系统；端口被其他服务占用时，会从后续十个端口中自动选择可用端口，并打开实际地址。
+
+检查环境而不启动服务：`python main.py --check`。不自动打开浏览器：`python main.py --no-browser`。也可指定端口，例如 `python main.py --port 8005`。一键启动脚本会优先使用项目 `.venv` / `venv`，然后查找系统Python。
+
+在 VS Code 或 PyCharm 中打开项目根目录的 `main.py`，运行该 Python 文件即可启动系统，也可以在终端执行 `python main.py`。当前已保留构建好的前端页面；修改源码后，停止原服务并重新启动，启动程序会按需构建前端。停止时在运行终端按 `Ctrl+C`。
+
+在本 README 所在的项目目录打开 PowerShell。首次使用或依赖缺失时安装依赖：
 
 ```powershell
-.\start-local.ps1
+python -m pip install -r backend\requirements.txt
+npm.cmd --prefix frontend ci
 ```
 
-启动后的访问地址：
-
-- 系统前端：<http://localhost:5173>
-- API 文档：<http://localhost:8000/docs>
-- 健康检查：<http://localhost:8000/health>
-
-正式数据库文件保存在 `data/sports_meet.db`，Excel 导出保存在 `data/exports`，数据库备份保存在 `data/backups`。复制整个项目文件夹即可连同数据一起迁移。
-
-停止服务：
+在第一个终端启动后端：
 
 ```powershell
-.\stop-local.ps1
+python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 ```
+
+在第二个终端启动前端：
+
+```powershell
+npm.cmd --prefix frontend run dev
+```
+
+浏览器打开 <http://localhost:5173>。后端接口文档为 <http://localhost:8000/docs>，健康检查为 <http://localhost:8000/health>。停止时在各服务终端按 `Ctrl+C`。
+
+也可先运行 `npm.cmd --prefix frontend run build` 生成前端页面，再只启动上述后端命令，通过 <http://localhost:8000> 访问完整系统；当前保留的 `frontend/dist` 用于这种运行方式。
+
+正式数据库位于 `data/sports_meet.db`，导出位于 `data/exports`，备份位于 `data/backups`。这些业务文件及 `.env` 配置均已保留。
 
 ## 本地演示账号
 
@@ -72,9 +81,11 @@ Windows 用户可直接双击项目根目录的 **`一键启动.bat`**。脚本�
 | 男子100米计分员 | `admin0002` | `Admin123456!` | 赛程、登记、导出 |
 | 男子100米裁判员 | `admin0003` | `Admin123456!` | 裁判审核、导出 |
 | 女子跳远裁判兼计分员 | `admin0004` | `Admin123456!` | 赛程、登记、审核、导出 |
-| 学生 | `2026001001` | `DF001001` | 可直接登录，不强制改密 |
+| 学生 | `2026001001` | `DF2026001001` | 可直接登录，不强制改密 |
 
-学生初始密码统一为 `DF + 学号后6位`。例如学号 `2026123456` 的初始密码为 `DF123456`。
+学生初始密码统一为 `DF + 完整学号`。例如学号 `2026123456` 的初始密码为 `DF2026123456`。开发人员可在“账号管理”或“名单录入 → 学生资料库”下载花名册模板，导入至少包含学号、姓名两列的 `.xlsx` 文件，即可批量注册学生账号，无需学生再次激活。性别、学院、专业、班级可一并导入，也可随后补充；项目报名仍需另行办理。重复导入已注册账号不会重置其密码。
+
+需要补齐预置账号时，在项目目录运行 `python scripts/fill-account-pool.py`。脚本先备份数据库，再补齐 `developer01`–`developer10` 和 `admin0001`–`admin0050`，保留已有账号的密码及资料；管理账号依次分配为体育部老师、计分员、裁判员、裁判兼计分员。全部现有账号的密码核对清单保存到 `data/exports/全部账号密码清单.md`。新增裁判和计分员需要按职责分配项目权限。
 
 ## 推荐业务流程
 
@@ -86,6 +97,8 @@ Windows 用户可直接双击项目根目录的 **`一键启动.bat`**。脚本�
 6. 初赛或晋级赛成绩发布后，可在名单页“按名次生成下一轮”，学生端会按学号自动同步晋级信息。
 
 ## 跳绳赛制
+
+当前系统的参赛学院范围为：信息工程学院、机电工程学院、外国语学院、食品工程学院、艺术设计学院、建筑工程学院、人文学院。学院代表队录入、批量生成及跳绳报名导入按数据库中的 `participating_colleges` 配置校验；名单外学院不会重新生成参赛队伍。
 
 开发人员或体育部老师可以从左侧菜单进入“跳绳赛制”。系统以运动会届次为数据边界，因此同一年可以分别建立春季运动会、田径运动会、趣味运动会等多届赛事；不同届次允许使用相同的跳绳项目编号，不会相互冲突。
 
@@ -116,6 +129,22 @@ Windows 用户可直接双击项目根目录的 **`一键启动.bat`**。脚本�
 - 成绩仍需依次经过“保存草稿 → 提交 → 裁判审核 → 体育部终审 → 发布”。发布时会保存跳绳成绩明细快照，后续修改草稿不会直接改变公开成绩。
 - 公开成绩中心会按项目显示“总次数”“完成 30 次及用时”或“未完成及有效次数”，不会展示系统内部排序值。
 
+### 学院报名表、手写登记表与最终汇总
+
+进入“跳绳赛制 → 报名表与比赛用表”，按以下流程使用：
+
+1. 选择目标运动会并初始化三个跳绳项目，点击“导入报名表”。支持 `.xlsx` 和 UTF-8/GB18030 编码的 `.csv`；旧版 `.xls` 请先另存为 `.xlsx`。系统自动查找学号、姓名、性别、学院等表头，支持常见别名、纵向合并的学院列，以及以学院名称命名的工作表。
+2. 三个项目可分为“计时计数项目”“集体单摇跳”“8字绕绳跳”工作表，也可放在一张总表的“参赛项目”列（多个项目以顿号或逗号分隔），或在三个项目列勾选报名。没有学院列时填写“默认学院”；没有项目时可仅导入22人总队，之后手动配置分项阵容。
+3. 点击“识别 / 重新预览”，核对人员、项目、角色和错误提示，再确认导入。相同学号的重复报名会去重，身份冲突或总队超过22人会阻止整批导入。学号保留文本与前导零；超过15位的数字学号须在原表中改成文本，以免Excel丢失精度。报名导入不会读取成绩、备注或覆盖已有成绩，也不自动创建登录账号。
+4. 有“角色”列时填写“跳绳者”或“摇绳者”。无角色列的12人/22人分项名单，只有确认末两人为摇绳者后，系统才按该顺序识别；否则导入后在“配置阵容”中选择。阵容未完成时不能抽签或导出手写登记表。
+5. 选择学院（也可选择全部学院）和小项目，点击“导出手写登记表”。每个学院每个项目各一张A4打印页，保留“序号、学号、姓名、性别、成绩、备注”六列，自动填好个人信息，只留成绩和备注两列空白。计时计数按男5人、女5人排列；团体项目末两人为摇绳者，成绩栏合并供填写全队成绩，并留裁判签字栏。
+6. 点击“随机抽签 / 生成赛程”，设置学校当地比赛开始时间、场地、每队时段与提前检录时间。系统按项目独立随机抽签，三个项目依次安排在同一场地，保存组次、出场序号及赛程草稿；在“赛程管理”核对并发布，再导出赛程表。已有赛程或成绩的项目不会被重新抽签覆盖。
+7. 比赛后由裁判在“成绩工作台”手动录入并完成审核发布。点击“导出最终排名汇总”，导出三个小项目的学院成绩、名次、积分，以及学院总积分排名。使用已发布快照，未发布学院标明完成情况，三项未全部发布时不列总名次；同积分保留并列名次（例如1、1、3）。
+
+导入和抽签由体育部老师或开发人员办理；裁判、计分员可以查看有权限的跳绳项目，并按项目导出权限下载登记表和赛程。跨三个项目的最终汇总要求具备全部三个项目的导出权限。
+
+七学院功能检测文件保存在 `outputs/rope-check-01a133c3/跳绳功能检测报名表_七学院.xlsx`。包含154名虚构学生、308条分项报名，每学院22人；三个工作表分别为计时计数项目、集体单摇跳和8字绕绳跳。请新建测试运动会、初始化跳绳项目后导入，表内摇绳者已标明，不需要选择“末两人为摇绳者”。
+
 ## 学生名单导入与成绩单导出
 
 - 学生名单模板：[学生参赛名单导入模板.xlsx](outputs/sports-meet/学生参赛名单导入模板.xlsx)
@@ -131,8 +160,8 @@ Windows 用户可直接双击项目根目录的 **`一键启动.bat`**。脚本�
 python -m alembic -c backend\alembic.ini upgrade head
 ```
 
-- Alembic 当前迁移版本为 `20260901_0009`（HEAD），支持动态配置数据库 URL，并在迁移脚本中包含针对 SQLite 批处理临时表的防护及列幂等性校验。
-- 迁移机制通过 `scripts/verify_alembic_3scenarios.py` 自动化验证三种发布场景（全新空白库初始化、从历史 0001 增量升级、表结构超前但迁移版本滞后补齐），全部通过并保持外键与完整性完好。
+- Alembic 当前迁移版本为 `20260916_0010`（HEAD），支持动态配置数据库 URL，并在迁移脚本中包含针对 SQLite 批处理临时表的防护及列幂等性校验。
+- 迁移机制通过 `tests/migration/verify_alembic_3scenarios.py` 自动化验证三种发布场景（全新空白库初始化、从历史 0001 增量升级、表结构超前但迁移版本滞后补齐），全部通过并保持外键与完整性完好。
 - Python 后端启动时会自动校验并升级数据表，并执行幂等演示数据初始化。正式使用前请在 `.env` 中设置 `AUTO_SEED=false`，并单独维护学校正式基础数据。
 - SQLite 连接通过 SQLAlchemy 事件钩子统一强制开启外键支持（`PRAGMA foreign_keys = ON`）、启用预写日志模式（`PRAGMA journal_mode = WAL`）并设置 30 秒忙等待（`PRAGMA busy_timeout = 30000`），保证高并发读写下数据的强一致性。
 
@@ -147,35 +176,25 @@ SQLite 数据库的备份与恢复：
 
 ## 测试与工程验收
 
-系统已建立覆盖单元测试、集成测试、权限安全校验、状态机闭环及 Playwright 端到端浏览器测试的完整自动化验收套件：
+用于GitHub发布的测试纳入仓库内的 [测试目录](tests/README.md)。从当前项目目录运行：
 
 ```powershell
-# 1. 后端全量回归与接口集成测试 (pytest)
-python -m pytest backend\tests -q
-# 执行结果: 24 passed, 0 failed (覆盖 7 个测试套件，耗时约 80 秒)
-
-# 2. 前端单元测试 (Vitest)
+python -B -m pytest tests\backend -q
+python -B tests\migration\verify_alembic_3scenarios.py
 npm.cmd --prefix frontend test
-# 执行结果: 1 passed (1 个测试文件，2 个用例全部通过)
-
-# 3. 前端类型检查与生产构建 (vue-tsc + Vite)
 npm.cmd --prefix frontend run build
-# 执行结果: SUCCESS (2279 模块转换完成，耗时约 24 秒)
-
-# 4. Playwright 浏览器真实端到端测试
 npm.cmd --prefix frontend run test:e2e
-# 执行结果: 3 passed, 0 failed (覆盖管理台工作空间、公开成绩中心届次隔离与学号脱敏、成绩全流程闭环及 30 秒轮询)
-
-# 5. Alembic 三场景迁移回归验证
-python scripts/verify_alembic_3scenarios.py
-# 执行结果: Fresh DB PASS, Legacy DB PASS, Schema Ahead PASS
 ```
 
-验收与质量报告详见：
-- [docs/CRUD_FUNCTION_MATRIX.md](docs/CRUD_FUNCTION_MATRIX.md)
-- [docs/PERMISSION_VERIFICATION_MATRIX.md](docs/PERMISSION_VERIFICATION_MATRIX.md)
-- [docs/FULL_CRUD_DATABASE_VERIFICATION_REPORT.md](docs/FULL_CRUD_DATABASE_VERIFICATION_REPORT.md)
+测试数据集中存放于 `tests/.runtime/`。本地原有外层“测试”目录保留；仓库下载后可直接运行内置测试。原有验收报告作为历史说明保留在 `docs/`，其中记录的是当时的执行结果；当前测试运行方法以上述命令为准。
 
+## Render 更新
+
+在现有服务保持仓库和`main`分支关联。构建命令需安装Python依赖并构建前端，例如：`pip install -r backend/requirements.txt && npm --prefix frontend ci && npm --prefix frontend run build`。启动命令为：`uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT`。
+
+目标服务`df-school-sports-meet.onrender.com`启动时，会依据用户指定的七学院范围同步学院配置、补齐通用队伍，并删除名单外队伍及其关联参赛记录、比赛和成绩；按用户要求不创建数据备份。学生资料、账号及保留队伍的已有成绩不会因该维护操作更改。仅对这个Render服务执行此同步，本地数据库由维护脚本控制。
+
+`/health`返回API版本、功能标记和Render部署提交SHA，可核对是否运行本次提交。数据库和导出数据通过现有环境变量与磁盘配置保留，不从本地上传`.env`或数据库。
 
 ## 生产部署提示
 

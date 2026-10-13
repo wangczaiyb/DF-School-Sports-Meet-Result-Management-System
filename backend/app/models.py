@@ -409,6 +409,6 @@ Index("idx_results_event_state_published", Result.event_id, Result.state, Result
 Index("idx_permissions_user_event", EventAdminPermission.user_id, EventAdminPermission.event_id)
 Index("idx_schedules_published_time", EventSchedule.published, EventSchedule.competition_at)
 
-# Register AI Copilot models with SQLAlchemy metadata
+# Register AI assistance models with SQLAlchemy metadata
 from .ai.models import AIModelConfig, AIConversation, AIMessage, AIToolLog, AIAuditLog  # noqa: E402, F401
 

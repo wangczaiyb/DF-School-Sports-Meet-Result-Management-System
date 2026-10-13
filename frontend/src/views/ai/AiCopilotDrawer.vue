@@ -256,7 +256,7 @@ onMounted(() => {
     destroy-on-close
   >
     <div class="copilot-container">
-      <!-- 1. Apple macOS 顶栏 Header -->
+      <!-- 1. 页面顶栏 -->
       <header class="copilot-header">
         <div class="header-left">
           <div class="ai-avatar-badge">
@@ -267,7 +267,7 @@ onMounted(() => {
               <h3>AI 赛事协同中心</h3>
               <span class="role-chip">{{ roleLabel[role] || role }}</span>
             </div>
-            <p class="subtitle">AI-Powered Sports Meet Copilot Platform</p>
+            <p class="subtitle">校园运动会赛事成绩管理系统 · AI 赛事协同</p>
           </div>
         </div>
 

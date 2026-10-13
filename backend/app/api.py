@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from decimal import Decimal
+from io import BytesIO
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from openpyxl import Workbook, load_workbook
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -75,7 +76,7 @@ from .schemas import (
     StudentRosterCreate,
     StudentRegisterRequest,
 )
-from .security import create_access_token, hash_password, verify_password
+from .security import create_access_token, hash_password, initial_student_password, verify_password
 from .services import (
     ADMIN_ROLES,
     add_review,
@@ -94,6 +95,7 @@ from .services import (
     validate_account_quota,
 )
 from .rope_rules import ROPE_RULES, rope_detail_payload, rope_lineup_status, rope_rule_for_event
+from .college_policy import configured_colleges, require_participating_college
 
 
 router = APIRouter()
@@ -171,7 +173,7 @@ def student_register(data: StudentRegisterRequest, db: Session = Depends(get_db)
     if roster.activated or roster.user_id:
         raise HTTPException(409, "该学号已经注册")
     validate_account_quota(db, Role.STUDENT)
-    initial_password = f"DF{data.student_no[-6:]}"
+    initial_password = initial_student_password(data.student_no)
     user = User(
         username=data.student_no,
         password_hash=hash_password(initial_password),
@@ -185,7 +187,7 @@ def student_register(data: StudentRegisterRequest, db: Session = Depends(get_db)
     roster.user_id = user.id
     roster.activated = True
     db.commit()
-    return {"message": "账号激活成功", "initial_password_hint": "DF + 学号后6位"}
+    return {"message": "账号激活成功", "initial_password_hint": "DF + 完整学号"}
 
 
 @router.post("/auth/change-password")
@@ -266,12 +268,14 @@ def list_accounts(
 
 @router.post("/developer/accounts")
 def create_account(data: AccountCreate, actor: User = Depends(developer_only), db: Session = Depends(get_db)):
+    if data.role == Role.STUDENT and not 6 <= len(data.username) <= 32:
+        raise HTTPException(422, "学生账号必须使用6至32位完整学号")
     validate_account_quota(db, data.role)
     if db.scalar(select(User.id).where(User.username == data.username)):
         raise HTTPException(409, "用户名已存在")
     user = User(
         username=data.username,
-        password_hash=hash_password(data.password),
+        password_hash=hash_password(initial_student_password(data.username) if data.role == Role.STUDENT else data.password),
         role=data.role,
         display_name=data.display_name,
         department=data.department,
@@ -372,13 +376,15 @@ def reset_password(user_id: int, data: ResetPasswordRequest, actor: User = Depen
     if not target:
         raise HTTPException(404, "账号不存在")
     if target.role == Role.STUDENT:
-        password = data.password or f"DF{target.username[-6:]}"
+        password = data.password or initial_student_password(target.username)
         target.first_login_change_required = False
     else:
         if not data.password:
             raise HTTPException(422, "管理人员重置密码时必须输入新密码")
         password = data.password
     target.password_hash = hash_password(password)
+    target.failed_login_count = 0
+    target.locked_until = None
     target.token_version += 1
     audit(db, actor, "RESET_PASSWORD", "user", target.id)
     db.commit()
@@ -641,6 +647,149 @@ def download_student_roster_template(_actor: User = Depends(business_admin)):
     )
 
 
+@router.get("/developer/students/template")
+def download_student_account_template(_actor: User = Depends(developer_only)):
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "学生名单"
+    sheet.append(["学号*", "姓名*", "性别", "学院", "专业", "班级"])
+    sheet.append(["2026001001", "张三"])
+    sheet.append(["2026001002", "李四"])
+    sheet.freeze_panes = "A2"
+    for column in "ABCDEF":
+        sheet.column_dimensions[column].width = 22
+    for row in sheet.iter_rows(min_row=2):
+        row[0].number_format = "@"
+    buffer = BytesIO()
+    workbook.save(buffer)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=student-account-roster.xlsx"},
+    )
+
+
+@router.post("/developer/students/import")
+def import_student_accounts(file: UploadFile = File(...), actor: User = Depends(developer_only), db: Session = Depends(get_db)):
+    if not file.filename or not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(422, "请上传 .xlsx 格式的学生花名册")
+    workbook = None
+    try:
+        workbook = load_workbook(file.file, read_only=True, data_only=True)
+        sheet = workbook["学生名单"] if "学生名单" in workbook.sheetnames else workbook.active
+        fields = {"学号": "student_no", "姓名": "name", "性别": "gender", "学院": "college", "专业": "major", "班级": "class_name"}
+        header_row = None
+        columns = {}
+        max_col = min(max(sheet.max_column or 2, 2), 64)
+        for row_index, row in enumerate(sheet.iter_rows(min_row=1, max_row=10, max_col=max_col, values_only=True), 1):
+            headers = [str(value or "").replace("*", "").strip() for value in row]
+            if "学号" in headers and "姓名" in headers:
+                if any(headers.count(label) > 1 for label in fields):
+                    raise HTTPException(422, "花名册表头存在重复列")
+                columns = {field: headers.index(label) for label, field in fields.items() if label in headers}
+                header_row = row_index
+                break
+        if header_row is None:
+            raise HTTPException(422, "花名册至少需要“学号”和“姓名”两列表头")
+
+        plans = []
+        errors = []
+        seen = {}
+        skipped = 0
+        for row_index, row in enumerate(sheet.iter_rows(min_row=header_row + 1, max_col=max_col, values_only=True), header_row + 1):
+            if not any(value is not None and str(value).strip() for value in row):
+                continue
+            values = {field: "" for field in fields.values()}
+            for field, column in columns.items():
+                value = row[column]
+                if isinstance(value, float) and value.is_integer():
+                    value = int(value)
+                values[field] = str(value).strip() if value is not None else ""
+            student_no, name = values["student_no"], values["name"]
+            if not (6 <= len(student_no) <= 32 and 1 <= len(name) <= 64):
+                errors.append(f"第 {row_index} 行学号需为6至32位，姓名需为1至64字")
+                continue
+            if values["gender"] not in {"", "男", "女"} or any(len(values[field]) > 128 for field in ("college", "major", "class_name")):
+                errors.append(f"第 {row_index} 行性别或学生资料格式不正确")
+                continue
+            if student_no in seen:
+                if seen[student_no] != name:
+                    errors.append(f"第 {row_index} 行与前面的同一学号姓名不一致")
+                else:
+                    skipped += 1
+                continue
+            seen[student_no] = name
+            roster = db.scalar(select(StudentRoster).where(StudentRoster.student_no == student_no))
+            user = db.scalar(select(User).where(User.username == student_no))
+            if roster and roster.name != name:
+                errors.append(f"第 {row_index} 行姓名与已有学生资料不一致")
+                continue
+            if user and (user.role != Role.STUDENT or user.display_name != name):
+                errors.append(f"第 {row_index} 行学号已被其他身份或姓名的账号使用")
+                continue
+            if roster and ((roster.user_id and (not user or roster.user_id != user.id)) or (roster.activated and not user)):
+                errors.append(f"第 {row_index} 行已有学生资料与账号关联不一致，请先核查")
+                continue
+            if user:
+                skipped += 1
+            plans.append((values, roster, user))
+        if errors:
+            raise HTTPException(422, {"message": "花名册校验失败，未注册任何账号", "errors": errors[:30]})
+        if not plans:
+            raise HTTPException(422, "花名册没有可处理的学生记录")
+        new_account_count = sum(user is None for _, _, user in plans)
+        current_count = db.scalar(select(func.count(User.id)).where(User.role == Role.STUDENT)) or 0
+        if current_count + new_account_count > 10000:
+            raise HTTPException(409, "注册后学生账号将超过 10000 个上限，未注册任何账号")
+
+        created = 0
+        registered = 0
+        for values, roster, user in plans:
+            if roster is None:
+                roster = StudentRoster(**values, activated=False)
+                db.add(roster)
+                db.flush()
+                created += 1
+            if user is None:
+                validate_account_quota(db, Role.STUDENT)
+                user = User(
+                    username=values["student_no"],
+                    display_name=values["name"],
+                    password_hash=hash_password(initial_student_password(values["student_no"])),
+                    role=Role.STUDENT,
+                    status=UserStatus.ACTIVE,
+                    department=roster.college,
+                    first_login_change_required=False,
+                    created_by_id=actor.id,
+                    updated_by_id=actor.id,
+                )
+                db.add(user)
+                db.flush()
+                audit(db, actor, "CREATE_ACCOUNT", "user", user.id, after=snapshot_user(user))
+                registered += 1
+            roster.user_id = user.id
+            roster.activated = True
+        audit(db, actor, "IMPORT_STUDENT_ACCOUNTS", "student_roster", file.filename, after={
+            "created": created, "registered": registered, "skipped": skipped,
+        })
+        db.commit()
+        return {"message": "学生花名册导入并注册完成", "created": created, "registered": registered,
+                "skipped": skipped, "initial_password_hint": "DF + 完整学号"}
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(409, "学号或账号已被同时创建，本次导入已取消，请重试") from exc
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(422, "Excel 文件无法读取或内容格式损坏，请使用系统模板重新填写") from exc
+    finally:
+        if workbook is not None:
+            workbook.close()
+        file.file.close()
+
+
 @router.post("/sports-teacher/students/import")
 def import_student_roster(file: UploadFile = File(...), actor: User = Depends(business_admin), db: Session = Depends(get_db)):
     if not file.filename or not file.filename.lower().endswith(".xlsx"):
@@ -742,6 +891,7 @@ def create_college_team(data: CollegeTeamCreate, actor: User = Depends(business_
     if not meet:
         raise HTTPException(404, "运动会不存在")
     college = data.college.strip()
+    require_participating_college(db, college)
     event_id = data.event_id if data.event_id else None
     event = db.get(Event, event_id) if event_id else None
     if event_id and (not event or event.meet_id != data.meet_id):
@@ -782,6 +932,7 @@ def update_college_team(team_id: int, data: CollegeTeamCreate, actor: User = Dep
     if not db.get(SportsMeet, data.meet_id):
         raise HTTPException(404, "运动会不存在")
     college = data.college.strip()
+    require_participating_college(db, college)
     event_id = data.event_id if data.event_id else None
     event = db.get(Event, event_id) if event_id else None
     if event_id and (not event or event.meet_id != data.meet_id):
@@ -853,7 +1004,9 @@ def generate_college_teams(data: CollegeTeamGenerate, actor: User = Depends(busi
     if event_id and (not event or event.meet_id != data.meet_id):
         raise HTTPException(422, "专项比赛项目不属于所选运动会")
     suffix = f"{event.name}代表队" if event else "代表队"
-    colleges = [str(value).strip() for value in db.scalars(select(StudentRoster.college).distinct().order_by(StudentRoster.college)) if str(value).strip()]
+    colleges = configured_colleges(db)
+    if colleges is None:
+        colleges = [str(value).strip() for value in db.scalars(select(StudentRoster.college).distinct().order_by(StudentRoster.college)) if str(value).strip()]
     existing = set(db.scalars(select(CollegeTeam.team_name).where(CollegeTeam.meet_id == data.meet_id, CollegeTeam.event_id == event_id)))
     created = 0
     for college in colleges:
@@ -2203,6 +2356,8 @@ def rope_status(_actor: User = Depends(business_admin), meet_id: int = Query(...
     if not meet:
         raise HTTPException(404, "运动会不存在")
     event_rows = list(db.scalars(select(Event).where(Event.meet_id == meet_id, Event.code.in_(list(ROPE_RULES)))))
+    event_rows = [event for event in event_rows if any(has_event_permission(db, _actor, event.id, permission)
+                  for permission in ("can_schedule", "can_score", "can_review", "can_export"))]
     by_code = {event.code: event for event in event_rows}
     items = []
     for code in ROPE_RULES:

@@ -1,1 +1,1 @@
-"""AI Copilot Platform module for Sports Meet System."""
+"""校园运动会赛事成绩管理系统的 AI 赛事协同模块。"""

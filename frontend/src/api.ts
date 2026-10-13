@@ -20,7 +20,10 @@ api.interceptors.response.use(
 
 export const errorMessage = (error: any) => {
   const detail = error?.response?.data?.detail
-  if (error?.response?.status === 404 && detail === 'Not Found') return '后台服务版本过旧，请双击“一键停止”后重新“一键启动”'
+  if (error?.response?.status === 404 && detail === 'Not Found') return '后台服务版本过旧，请联系系统负责人重启后台服务'
+  if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+    return [detail.message, ...(detail.errors || [])].filter(Boolean).join('；') || '操作失败，请核对输入内容'
+  }
   return detail || error?.message || '操作失败，请稍后重试'
 }
 export default api

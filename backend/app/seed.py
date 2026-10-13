@@ -27,12 +27,12 @@ from .models import (
     User,
     utcnow,
 )
-from .security import hash_password
+from .security import hash_password, initial_student_password
 
 
 DEFAULT_SETTINGS = {
     "system_name": "校园运动会赛事成绩管理系统",
-    "short_name": "校园运动会",
+    "short_name": "校园运动会赛事成绩管理系统",
     "browser_title": "校园运动会赛事成绩管理系统",
     "login_heading": "让每一次冲刺，都被准确记录",
     "login_subtitle": "赛事编排、成绩审核与荣誉发布，一站式协同完成",
@@ -324,7 +324,7 @@ def seed_database(db: Session) -> None:
     college_females = {}
 
     for index, (student_no, name, gender, college, major, class_name, result_value) in enumerate(student_data):
-        student_user = _user(db, student_no, f"DF{student_no[-6:]}", Role.STUDENT, name, college, False)
+        student_user = _user(db, student_no, initial_student_password(student_no), Role.STUDENT, name, college, False)
         student = StudentRoster(student_no=student_no, name=name, gender=gender, college=college, major=major, class_name=class_name, activated=True, user_id=student_user.id)
         db.add(student)
         db.flush()

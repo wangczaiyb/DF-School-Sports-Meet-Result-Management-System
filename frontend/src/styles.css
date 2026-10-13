@@ -1,13 +1,13 @@
 /* 
-  校园运动会成绩管理系统 - Apple Design System (macOS / iOS 17 / VisionOS 风格)
+  校园运动会赛事成绩管理系统 - 界面样式
 */
 
 :root {
-  /* 苹果系统字体规范 */
+  /* 系统字体设置 */
   --font-apple: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "SF Pro Icons", "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --font-mono: "SF Mono", "JetBrains Mono", Consolas, monospace;
 
-  /* 苹果官方系统色彩 (Apple System Colors) */
+  /* 界面主题色彩 */
   --apple-blue: #007aff;
   --apple-blue-hover: #0062cc;
   --apple-blue-soft: rgba(0, 122, 255, 0.1);
@@ -26,29 +26,29 @@
 
   --apple-teal: #30b0c7;
 
-  /* 苹果文本色彩梯队 */
+  /* 文本层级色彩 */
   --apple-label: #1c1c1e;
   --apple-secondary: #3a3a3c;
   --apple-tertiary: #8e8e93;
   --apple-quaternary: #aeaeb2;
 
-  /* 苹果 macOS System Background (Sonoma / iOS 17 暖灰底) */
+  /* 暖灰色界面背景 */
   --apple-bg: #f5f5f7;
   --apple-card-bg: rgba(255, 255, 255, 0.82);
   --apple-card-solid: #ffffff;
   --apple-sidebar-bg: #f6f6f8;
 
-  /* 苹果微高光边框与毛玻璃 */
+  /* 高光边框与毛玻璃效果 */
   --apple-border: rgba(0, 0, 0, 0.06);
   --apple-border-light: rgba(255, 255, 255, 0.8);
   --apple-glass-backdrop: blur(25px) saturate(190%);
 
-  /* 苹果气泡阴影 (Apple Ambient Shadow) */
+  /* 界面阴影 */
   --apple-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
   --apple-shadow-md: 0 8px 24px -4px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
   --apple-shadow-lg: 0 16px 36px -6px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
 
-  /* 苹果连续曲率圆角 (Apple Squircle Radius) */
+  /* 连续曲率圆角 */
   --apple-radius-sm: 10px;
   --apple-radius-md: 14px;
   --apple-radius-lg: 18px;
@@ -81,7 +81,7 @@ a {
   text-decoration: none;
 }
 
-/* 苹果标准卡片 (Apple Vibrant Card) */
+/* 标准卡片 */
 .panel {
   background: var(--apple-card-bg);
   backdrop-filter: var(--apple-glass-backdrop);
@@ -97,7 +97,7 @@ a {
   border-color: rgba(0, 122, 255, 0.2);
 }
 
-/* 苹果风格表格 (Apple macOS Table) */
+/* 表格样式 */
 .el-table {
   --el-table-header-bg-color: rgba(245, 245, 247, 0.7) !important;
   --el-table-header-text-color: #8e8e93 !important;
@@ -123,7 +123,7 @@ a {
   padding: 11px 0 !important;
 }
 
-/* 苹果按钮 (Apple Rounded Pills & Buttons) */
+/* 圆角按钮 */
 .el-button--primary:not(.is-link):not(.is-text) {
   --el-button-bg-color: var(--apple-blue) !important;
   --el-button-border-color: var(--apple-blue) !important;
@@ -139,7 +139,7 @@ a {
   border-radius: 9999px !important;
 }
 
-/* 苹果风格表格操作链接 (Clean Apple Table Actions) */
+/* 表格操作链接 */
 .el-table .el-button.is-link {
   padding: 3px 8px !important;
   height: 26px !important;
@@ -170,7 +170,7 @@ a {
   background: rgba(255, 59, 48, 0.1) !important;
 }
 
-/* 苹果 Modal 风格 (macOS Sheet Modal) */
+/* 弹窗样式 */
 .el-dialog {
   border-radius: 22px !important;
   background: rgba(255, 255, 255, 0.95) !important;

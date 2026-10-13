@@ -30,7 +30,7 @@
   - 修复 `backend/alembic/env.py` 动态读取 `sqlalchemy.url` 与设置，彻底支持 Windows 绝对/相对路径。
   - 在批处理 DDL 中针对 SQLite 特性增加了 `_alembic_tmp_results` 临时表残留清理，并添加了列存在的幂等性检查，杜绝反复执行迁移时的中断异常。
 
-### 2.2 三场景自动化迁移回归验证 (`scripts/verify_alembic_3scenarios.py`)
+### 2.2 三场景自动化迁移回归验证 (`../测试/migration/verify_alembic_3scenarios.py`)
 使用独立沙箱对三种高风险现实发布场景进行全面测试，均 100% 成功：
 
 | 验证场景 | 初始状态 | 升级过程 | 最终状态 | 完整性与外键校验 | 结果 |
@@ -159,7 +159,7 @@ $$\text{DRAFT} \xrightarrow{\text{录入/保存}} \text{SUBMITTED} \xrightarrow{
 ```text
 ==================================== 自动化验收总览 ====================================
 1. 后端全量测试 (pytest):
-   命令: python -m pytest backend\tests -q
+   命令: python -m pytest ..\测试\backend -q
    结果: 24 passed, 0 failed in 80.88s (覆盖 7 个测试文件)
 
 2. 前端单元测试 (Vitest):
@@ -175,7 +175,7 @@ $$\text{DRAFT} \xrightarrow{\text{录入/保存}} \text{SUBMITTED} \xrightarrow{
    结果: 3 passed, 0 failed in 50.4s
 
 5. Alembic 三大复杂场景迁移验证:
-   命令: python scripts/verify_alembic_3scenarios.py
+   命令: python ../测试/migration/verify_alembic_3scenarios.py
    结果:
      - Scenario A (Fresh DB): PASS (24 tables, integrity: ok, fk: 0)
      - Scenario B (Legacy DB): PASS (25 tables, integrity: ok, fk: 0)
