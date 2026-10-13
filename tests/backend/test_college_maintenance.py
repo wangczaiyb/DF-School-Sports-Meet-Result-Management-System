@@ -1,4 +1,4 @@
-"""目标Render七学院同步的隔离数据验证。"""
+"""目标Render参赛学院同步的隔离数据验证。"""
 from sqlalchemy import create_engine, select, func
 from sqlalchemy.orm import Session
 
@@ -26,12 +26,13 @@ def test_render_sync_limits_colleges_and_keeps_accounts_students_and_repeat_stat
             assert db.scalar(select(func.count(User.id))) == users
             assert db.scalar(select(func.count(StudentRoster.id))) == students
             require_participating_college(db, '食品工程学院')
+            require_participating_college(db, '经济管理学院')
             with pytest.raises(HTTPException) as error:
                 require_participating_college(db, '名单外学院')
             assert error.value.status_code == 422
             db.commit()
             synchronize_render_colleges(db)
             db.commit()
-            assert db.scalar(select(func.count(CollegeTeam.id))) == 7
+            assert db.scalar(select(func.count(CollegeTeam.id))) == len(DEFAULT_COLLEGES)
     finally:
         local_engine.dispose()

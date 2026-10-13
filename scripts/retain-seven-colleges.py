@@ -1,4 +1,4 @@
-"""用户指定的七学院清理。默认预览，--apply先备份再执行。"""
+"""维护学校当前参赛学院范围（现为8个）；保留旧脚本路径以兼容已有命令。"""
 from __future__ import annotations
 
 import argparse
@@ -40,7 +40,7 @@ def main():
         raise SystemExit('备份路径必须位于项目目录内')
     if not args.no_backup:
         backup_dir.mkdir(exist_ok=True)
-    backup_path = backup_dir / f'sports_meet_{stamp}_before_seven_colleges.db'
+    backup_path = backup_dir / f'sports_meet_{stamp}_before_college_scope.db'
     with sqlite3.connect(database, timeout=30) as db:
         db.row_factory = sqlite3.Row
         db.execute('PRAGMA foreign_keys=ON')

@@ -39,7 +39,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="1.3.0",
+    version="1.3.1",
     description="校园运动会赛事、赛程、成绩审核、计分和发布 API",
     lifespan=lifespan,
 )
@@ -66,7 +66,7 @@ from fastapi.responses import FileResponse
 def health():
     return {
         "status": "ok",
-        "api_version": "1.3.0",
+        "api_version": "1.3.1",
         "deploy_commit": os.environ.get('RENDER_GIT_COMMIT'),
         "features": [
             "manual-student-roster",
@@ -79,7 +79,7 @@ def health():
             "rope-skipping-workbench",
             "rope-registration-tables",
             "configured-college-team-scope",
-            "seven-college-render-sync",
+            "college-roster-render-sync",
             "immutable-published-results",
             "ai-copilot-platform",
         ],

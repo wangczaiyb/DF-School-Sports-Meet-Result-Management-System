@@ -45,7 +45,7 @@ data/backups/*
 # Temporary files
 **/.runtime/
 outputs/rope-check-01a133c3/*
-!outputs/rope-check-01a133c3/跳绳功能检测报名表_七学院.xlsx
+!outputs/rope-check-01a133c3/跳绳功能检测报名表_八学院.xlsx
 .tmp/
 tmp/
 *.tmp

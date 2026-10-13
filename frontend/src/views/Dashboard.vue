@@ -1177,7 +1177,7 @@ const eventsForTeamMeet = computed(() => {
 })
 
 const distinctColleges = computed(() => {
-  const defaults = ['信息工程学院', '机电工程学院', '外国语学院', '食品工程学院', '艺术设计学院', '建筑工程学院', '人文学院']
+  const defaults = ['信息工程学院', '机电工程学院', '外国语学院', '食品工程学院', '艺术设计学院', '建筑工程学院', '人文学院', '经济管理学院']
   try {
     const configured = JSON.parse(settings.participating_colleges || 'null')
     if (Array.isArray(configured) && configured.every((college: any) => typeof college === 'string')) return configured

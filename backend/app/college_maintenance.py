@@ -1,4 +1,4 @@
-"""七学院参赛范围的数据维护，调用方负责事务。"""
+"""学校参赛学院范围的数据维护，调用方负责事务。"""
 from datetime import datetime, timezone
 import json
 import sqlite3
@@ -10,10 +10,10 @@ def placeholders(values):
 
 
 def synchronize_render_colleges(session):
-    """仅目标Render服务调用；配置和关联数据与本地七学院范围一致。"""
+    """仅目标Render服务调用；配置和关联数据与学校当前学院范围一致。"""
     driver = session.connection().connection.driver_connection
     if not isinstance(driver, sqlite3.Connection):
-        raise RuntimeError('七学院数据维护要求SQLite数据库')
+        raise RuntimeError('参赛学院数据维护要求SQLite数据库')
     old_factory = driver.row_factory
     driver.row_factory = sqlite3.Row
     try:
@@ -89,8 +89,8 @@ def retain_colleges(db, backed_up=True):
         raise RuntimeError('保留的成绩记录发生意外变化')
     report['retained_colleges'] = [row[0] for row in db.execute('SELECT DISTINCT college FROM college_teams ORDER BY college')]
     db.execute('INSERT INTO audit_logs(actor_id,actor_username,action,target_type,target_id,before_data,after_data,reason,created_at) '
-               'VALUES (NULL,?,?,?,?,?,?,?,?)', ('codex', 'RETAIN_SEVEN_COLLEGES', 'college_team', 'all',
+               'VALUES (NULL,?,?,?,?,?,?,?,?)', ('codex', 'RETAIN_PARTICIPATING_COLLEGES', 'college_team', 'all',
                                                 json.dumps({'removed': removed}, ensure_ascii=False), json.dumps(report, ensure_ascii=False),
-                                                '用户明确要求只保留指定七个学院，删除名单外队伍及其关联参赛数据；'
+                                                f'用户明确要求只保留指定{len(DEFAULT_COLLEGES)}个学院，删除名单外队伍及其关联参赛数据；'
                                                 + ('执行前已完整备份' if backed_up else '按用户明确要求不创建备份'), now))
     return report
