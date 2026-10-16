@@ -22,14 +22,24 @@ test('rope registration preview, college print sheets and schedule drafts work t
   await expect(page).toHaveURL(/\/app$/)
   await page.getByRole('button', { name: '跳绳赛制', exact: true }).click()
   await expect(page.getByRole('heading', { name: '报名表与比赛用表' })).toBeVisible()
+  const templateButton = page.getByRole('button', { name: '下载模板', exact: true })
+  await expect(templateButton).toBeEnabled()
+  const templateDownload = page.waitForEvent('download')
+  await templateButton.click()
+  const template = await templateDownload
+  expect(template.suggestedFilename()).toBe('跳绳比赛报名表模板.xlsx')
+  await template.saveAs(path.resolve(__dirname, '../../.runtime/e2e/rope-registration-template.xlsx'))
+  const templateBounds = await templateButton.boundingBox()
+  const importBounds = await page.getByRole('button', { name: '导入报名表', exact: true }).boundingBox()
+  expect(templateBounds!.x).toBeLessThan(importBounds!.x)
   await page.locator('.el-select').nth(2).click()
   await page.locator('.el-select-dropdown__item').filter({ hasText: `跳绳表格验收${suffix}` }).click()
   await expect(page.getByText('集体单摇跳', { exact: true }).first()).toBeVisible()
   await page.getByRole('button', { name: '导入报名表', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '识别学院跳绳报名表' })
   const people = [
-    ...Array.from({ length: 11 }, (_, i) => ({ no: `E${suffix}M${i}`, name: `男队员${i + 1}`, gender: '男' })),
-    ...Array.from({ length: 11 }, (_, i) => ({ no: `E${suffix}F${i}`, name: `女队员${i + 1}`, gender: '女' })),
+    ...Array.from({ length: 11 }, (_, i) => ({ no: `${String(meet.id).padStart(5, '0')}1${String(i).padStart(2, '0')}`, name: `男队员${i + 1}`, gender: '男' })),
+    ...Array.from({ length: 11 }, (_, i) => ({ no: `${String(meet.id).padStart(5, '0')}2${String(i).padStart(2, '0')}`, name: `女队员${i + 1}`, gender: '女' })),
   ]
   const turners = [people[10], people[21]]
   const rows = [['学号', '姓名', '性别', '学院', '项目', '角色']]

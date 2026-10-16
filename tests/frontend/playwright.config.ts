@@ -2,7 +2,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 const { defineConfig } = require('@playwright/test')
 const project = path.resolve(__dirname, '../..')
-const runtime = path.resolve(__dirname, '../.runtime/e2e')
+const runtime = process.env.SPORTS_E2E_RUNTIME_DIR || path.resolve(__dirname, '../.runtime/e2e')
 fs.mkdirSync(runtime, { recursive: true })
 
 export default defineConfig({

@@ -38,7 +38,7 @@ def test_auth_identity_and_public_visibility():
     with TestClient(app) as client:
         developer = login(client, "developer", "developer01", "Dev123456!")
         teacher = login(client, "admin", "admin0001", "Admin123456!")
-        student = login(client, "student", "2026001001", "DF2026001001")
+        student = login(client, "student", "26001001", "DF26001001")
         assert developer["user"]["role"] == "DEVELOPER"
         assert teacher["user"]["role"] == "SPORTS_TEACHER"
         assert student["user"]["role"] == "STUDENT"
@@ -144,7 +144,7 @@ def test_manual_student_and_college_team_roster_entry():
         teacher = login(client, "admin", "admin0001", "Admin123456!")
         auth = headers(teacher["access_token"])
         student_payload = {
-            "student_no": "2026999001",
+            "student_no": "20269001",
             "name": "名单测试学生",
             "gender": "女",
             "college": "测试学院",
@@ -156,7 +156,7 @@ def test_manual_student_and_college_team_roster_entry():
         assert created_student.json()["activated"] is False
         duplicate_student = client.post("/api/v1/sports-teacher/students", headers=auth, json=student_payload)
         assert duplicate_student.status_code == 409
-        student_list = client.get("/api/v1/sports-teacher/students", headers=auth, params={"keyword": "2026999001"})
+        student_list = client.get("/api/v1/sports-teacher/students", headers=auth, params={"keyword": "20269001"})
         assert student_list.status_code == 200
         assert student_list.json()["total"] == 1
         student_id = student_list.json()["items"][0]["id"]
@@ -199,7 +199,7 @@ def test_manual_student_and_college_team_roster_entry():
         assert inactive_score.status_code == 200, inactive_score.text
         activated = client.post("/api/v1/auth/student-register", json={"student_no": student_payload["student_no"], "name": student_payload["name"]})
         assert activated.status_code == 200, activated.text
-        student_login = login(client, "student", student_payload["student_no"], "DF2026999001")
+        student_login = login(client, "student", student_payload["student_no"], "DF20269001")
         assert student_login["first_login_change_required"] is False
         student_events = client.get("/api/v1/student/my-events", headers=headers(student_login["access_token"])).json()
         matching_rounds = {item["round_name"] for item in student_events if item["event_id"] == female_event["id"]}
@@ -263,7 +263,7 @@ def test_market_workflow_seeding_advancement_export_schedule_and_crud():
         student_ids = []
         for index in range(2):
             payload = {
-                "student_no": f"202688880{index}",
+                "student_no": f"2026888{index}",
                 "name": f"晋级测试{index + 1}",
                 "gender": "男",
                 "college": "流程测试学院",
@@ -474,10 +474,10 @@ def test_college_teams_per_event_and_member_editing():
 
         # 4. 创建学生并添加为比赛成员
         s1 = client.post("/api/v1/sports-teacher/students", headers=auth, json={
-            "student_no": "2026999901", "name": "李队员", "gender": "女", "college": "计算机学院", "major": "软件工程", "class_name": "2601班"
+            "student_no": "20269901", "name": "李队员", "gender": "女", "college": "计算机学院", "major": "软件工程", "class_name": "2601班"
         }).json()
         s2 = client.post("/api/v1/sports-teacher/students", headers=auth, json={
-            "student_no": "2026999902", "name": "张队长", "gender": "男", "college": "计算机学院", "major": "软件工程", "class_name": "2601班"
+            "student_no": "20269902", "name": "张队长", "gender": "男", "college": "计算机学院", "major": "软件工程", "class_name": "2601班"
         }).json()
 
         # 批量添加队员

@@ -14,6 +14,7 @@ from .database import Base, SessionLocal, engine, ensure_sqlite_team_registratio
 from .seed import seed_database
 from .services import sync_event_rounds
 from .college_maintenance import synchronize_render_colleges
+from .rope_college_sync import synchronize_existing_rope_meets
 
 
 settings = get_settings()
@@ -32,6 +33,8 @@ async def lifespan(_app: FastAPI):
         if os.environ.get('RENDER') == 'true' and os.environ.get('RENDER_EXTERNAL_HOSTNAME') == 'df-school-sports-meet.onrender.com':
             synchronize_render_colleges(db)
             db.commit()
+        synchronize_existing_rope_meets(db)
+        db.commit()
         if settings.database_url.startswith("sqlite"):
             db.execute(text("PRAGMA optimize"))
     yield
@@ -80,6 +83,7 @@ def health():
             "rope-registration-tables",
             "configured-college-team-scope",
             "college-roster-render-sync",
+            "rope-college-registration-sync",
             "immutable-published-results",
             "ai-copilot-platform",
         ],

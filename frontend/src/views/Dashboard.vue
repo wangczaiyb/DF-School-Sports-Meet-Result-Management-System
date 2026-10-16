@@ -1228,7 +1228,22 @@ async function loadRosterData() {
 
 function openCreateAccount(){accountEditingId.value=null;Object.assign(accountForm,{username:'',display_name:'',password:'',role:'SCORER',department:'体育部',employee_no:'',phone:''});accountDialog.value=true}
 function openEditAccount(row:any){accountEditingId.value=row.id;Object.assign(accountForm,{username:row.username,display_name:row.display_name,password:'',role:row.role,department:row.department||'',employee_no:row.employee_no||'',phone:row.phone||''});accountDialog.value=true}
-async function saveAccount() { try { const payload={...accountForm};if(!accountEditingId.value&&payload.role==='STUDENT')payload.password=`DF${payload.username}`;if(!payload.password)delete payload.password;if(accountEditingId.value)await api.put(`/developer/accounts/${accountEditingId.value}`,payload);else await api.post('/developer/accounts',payload);ElMessage.success(accountEditingId.value?'账号修改成功':'账号创建成功');accountDialog.value=false;loadActive() } catch(e){ElMessage.error(errorMessage(e))} }
+async function saveAccount() {
+  const payload = { ...accountForm }
+  if (payload.role === 'STUDENT') {
+    payload.username = payload.username.trim()
+    if (!/^[0-9]{8}$/.test(payload.username)) return ElMessage.warning('学生账号必须使用8位数字学号')
+    if (!accountEditingId.value) payload.password = `DF${payload.username}`
+  }
+  try {
+    if (!payload.password) delete payload.password
+    if (accountEditingId.value) await api.put(`/developer/accounts/${accountEditingId.value}`, payload)
+    else await api.post('/developer/accounts', payload)
+    ElMessage.success(accountEditingId.value ? '账号修改成功' : '账号创建成功')
+    accountDialog.value = false
+    loadActive()
+  } catch (e) { ElMessage.error(errorMessage(e)) }
+}
 async function toggleFreeze(row:any) { try { if(row.status==='ACTIVE'){ const {value}=await ElMessageBox.prompt('请填写冻结原因','冻结账号',{inputPlaceholder:'例如：岗位调整'});await api.post(`/developer/accounts/${row.id}/freeze`,{reason:value}) } else await api.post(`/developer/accounts/${row.id}/unfreeze`);ElMessage.success('账号状态已更新');loadActive() } catch(e:any){if(e!=='cancel')ElMessage.error(errorMessage(e))} }
 async function forceLogout(row:any) { try { await api.post(`/developer/accounts/${row.id}/force-logout`);ElMessage.success('已强制退出') } catch(e){ElMessage.error(errorMessage(e))} }
 async function resetAccountPassword(row:any){try{if(row.role==='STUDENT'){await ElMessageBox.confirm('恢复为 DF + 完整学号。','重置密码');await api.post(`/developer/accounts/${row.id}/reset-password`,{})}else{const {value}=await ElMessageBox.prompt('输入至少8位新密码','重置密码',{inputType:'password',inputValidator:(v)=>v.length>=8||'密码至少8位'});await api.post(`/developer/accounts/${row.id}/reset-password`,{password:value})}ElMessage.success('密码已重置')}catch(e:any){if(e!=='cancel')ElMessage.error(errorMessage(e))}}
@@ -1309,6 +1324,8 @@ async function downloadRosterTemplate() {
 }
 function openStudentRoster(row?:any){const editing=!!row?.id;studentRosterEditingId.value=editing?row.id:null;Object.assign(studentRosterForm,editing?{student_no:row.student_no,name:row.name,gender:row.gender,college:row.college,major:row.major,class_name:row.class_name}:{student_no:'',name:'',gender:'男',college:'',major:'',class_name:''});studentRosterDialog.value=true}
 async function saveStudentRoster(){
+  studentRosterForm.student_no = String(studentRosterForm.student_no || '').trim()
+  if (!/^[0-9]{8}$/.test(studentRosterForm.student_no)) return ElMessage.warning('学号必须为8位数字')
   if (!studentRosterForm.student_no || !studentRosterForm.name || !studentRosterForm.college || !studentRosterForm.major || !studentRosterForm.class_name) return ElMessage.warning('请完整填写学号、姓名、学院、专业和班级')
   try{if(studentRosterEditingId.value)await api.put(`/sports-teacher/students/${studentRosterEditingId.value}`,studentRosterForm);else await api.post('/sports-teacher/students',studentRosterForm);ElMessage.success('学生资料已更新');studentRosterDialog.value=false;await loadRosterData()}catch(e){ElMessage.error(errorMessage(e))}
 }
@@ -3258,7 +3275,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
     <!-- 业务表单弹窗 -->
     <el-dialog v-model="accountDialog" :title="accountEditingId ? '编辑账号' : '创建新账号'" width="520px">
       <el-form label-position="top" class="apple-dialog-form">
-        <el-form-item label="用户名"><el-input v-model="accountForm.username" :disabled="!!accountEditingId"/></el-form-item>
+        <el-form-item :label="accountForm.role === 'STUDENT' ? '学号' : '用户名'"><el-input v-model="accountForm.username" :disabled="!!accountEditingId" :maxlength="accountForm.role === 'STUDENT' ? 8 : 64" :inputmode="accountForm.role === 'STUDENT' ? 'numeric' : 'text'" :placeholder="accountForm.role === 'STUDENT' ? '请输入8位数字学号' : '请输入用户名'"/></el-form-item>
         <el-form-item label="姓名"><el-input v-model="accountForm.display_name"/></el-form-item>
         <el-form-item v-if="!accountEditingId && accountForm.role === 'STUDENT'" label="初始密码"><el-input :model-value="`DF${accountForm.username}`" disabled/></el-form-item>
         <el-form-item v-else label="密码"><el-input v-model="accountForm.password" type="password" show-password/></el-form-item>
@@ -3274,7 +3291,10 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
 
     <el-dialog v-model="studentRosterDialog" :title="studentRosterEditingId ? '编辑学生资料' : '新增学生资料'" width="520px">
       <el-form label-position="top" class="apple-dialog-form">
-        <el-form-item label="学号"><el-input v-model="studentRosterForm.student_no"/></el-form-item>
+        <el-form-item label="学号">
+          <el-input v-model="studentRosterForm.student_no" maxlength="8" inputmode="numeric" placeholder="例如24000001（24级），共8位数字" show-word-limit/>
+          <div style="font-size:12px;color:#666">前两位表示年级，例如24表示24级。</div>
+        </el-form-item>
         <el-form-item label="姓名"><el-input v-model="studentRosterForm.name"/></el-form-item>
         <el-form-item label="性别"><el-select v-model="studentRosterForm.gender"><el-option label="男" value="男"/><el-option label="女" value="女"/></el-select></el-form-item>
         <el-form-item label="学院"><el-input v-model="studentRosterForm.college"/></el-form-item>
@@ -3545,7 +3565,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
       </div>
       <div v-else style="background:#f5f5f7;border-radius:12px;padding:20px;text-align:center">
         <p style="font-size:14px;color:#8e8e93;margin:0 0 12px">当前运动会届次暂未创建学院代表队</p>
-        <el-button type="success" size="default" @click="quickGenerateTeamsForCurrentMeet">⚡ 一键为当前届次生成 6 学院代表队</el-button>
+        <el-button type="success" size="default" @click="quickGenerateTeamsForCurrentMeet">⚡ 一键为当前届次生成 {{ distinctColleges.length }} 学院代表队</el-button>
         <el-button plain size="default" @click="active = 'rosters'">👥 前往名单录入中心</el-button>
       </div>
       <template #footer>
@@ -3733,7 +3753,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
       </div>
       <div v-else style="background:#f5f5f7;border-radius:12px;padding:20px;text-align:center">
         <p style="font-size:14px;color:#8e8e93;margin:0 0 12px">当前运动会届次暂未创建学院代表队</p>
-        <el-button type="success" size="default" @click="quickGenerateTeamsForCurrentMeet">⚡ 一键为当前届次生成 6 学院代表队</el-button>
+        <el-button type="success" size="default" @click="quickGenerateTeamsForCurrentMeet">⚡ 一键为当前届次生成 {{ distinctColleges.length }} 学院代表队</el-button>
         <el-button plain size="default" @click="active = 'rosters'">👥 前往名单录入中心</el-button>
       </div>
       <template #footer>
@@ -3999,7 +4019,7 @@ onMounted(async()=>{try{const me=(await api.get('/auth/me')).data;if(me.role!=='
       </div>
       <div v-else style="background:#f5f5f7;border-radius:12px;padding:20px;text-align:center">
         <p style="font-size:14px;color:#8e8e93;margin:0 0 12px">当前运动会届次暂未创建学院代表队</p>
-        <el-button type="success" size="default" @click="quickGenerateTeamsForCurrentMeet">⚡ 一键为当前届次生成 6 学院代表队</el-button>
+        <el-button type="success" size="default" @click="quickGenerateTeamsForCurrentMeet">⚡ 一键为当前届次生成 {{ distinctColleges.length }} 学院代表队</el-button>
         <el-button plain size="default" @click="active = 'rosters'">👥 前往名单录入中心</el-button>
       </div>
       <template #footer>

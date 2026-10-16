@@ -34,7 +34,7 @@ function selectRole(kind: LoginKind) {
   form.kind = kind
   if (kind === 'developer') Object.assign(form, { username: 'developer01', password: 'Dev123456!' })
   if (kind === 'admin') Object.assign(form, { username: 'admin0001', password: 'Admin123456!' })
-  if (kind === 'student') Object.assign(form, { username: '2026001001', password: 'DF2026001001' })
+  if (kind === 'student') Object.assign(form, { username: '26001001', password: 'DF26001001' })
 }
 
 async function submit() {
@@ -52,6 +52,8 @@ async function submit() {
 }
 
 async function registerStudent() {
+  registerForm.student_no = registerForm.student_no.trim()
+  if (!/^[0-9]{8}$/.test(registerForm.student_no)) return ElMessage.warning('学号必须为8位数字')
   try {
     await api.post('/auth/student-register', registerForm)
     ElMessage.success('账号激活成功，可用初始密码直接登录，不强制修改密码')
@@ -218,7 +220,7 @@ onMounted(async () => {
 
     <el-dialog v-model="registerVisible" title="激活学生账号" width="420px">
       <el-form label-position="top">
-        <el-form-item label="学号"><el-input v-model="registerForm.student_no" placeholder="须与参赛名单一致" /></el-form-item>
+        <el-form-item label="学号"><el-input v-model="registerForm.student_no" maxlength="8" inputmode="numeric" placeholder="例如24000001（24级），须与名单一致" /></el-form-item>
         <el-form-item label="姓名"><el-input v-model="registerForm.name" placeholder="请输入真实姓名" /></el-form-item>
       </el-form>
       <template #footer><el-button @click="registerVisible = false">取消</el-button><el-button type="primary" @click="registerStudent">核验并激活</el-button></template>

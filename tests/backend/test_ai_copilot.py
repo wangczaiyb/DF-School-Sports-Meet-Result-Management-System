@@ -55,7 +55,7 @@ def referee_headers(client: TestClient):
 
 @pytest.fixture
 def student_headers(client: TestClient):
-    token = _login(client, "student", "2026001001", "DF2026001001")
+    token = _login(client, "student", "26001001", "DF26001001")
     return _headers(token)
 
 

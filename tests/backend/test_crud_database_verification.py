@@ -78,7 +78,7 @@ def _event_payload(meet_id: int, code: str, name: str, event_type: str = "INDIVI
 
 def _student_payload(index: int, *, college: str = "CODEX_TEST_学院", gender: str = "男") -> dict:
     return {
-        "student_no": f"CODEX_TEST_{index:06d}",
+        "student_no": f"{80000000 + index:08d}",
         "name": f"CODEX_TEST_学生_{index}",
         "gender": gender,
         "college": college,
@@ -221,7 +221,7 @@ def test_meet_event_student_team_schedule_crud_and_cross_meet_isolation():
         updated_student_payload = {**_student_payload(100001), "name": "CODEX_TEST_学生_已更新", "major": "CODEX_TEST_新专业"}
         assert client.put(f"/api/v1/sports-teacher/students/{student_id}", headers=auth, json=updated_student_payload).status_code == 200
         assert client.post("/api/v1/sports-teacher/students", headers=auth, json=updated_student_payload).status_code == 409
-        assert client.get("/api/v1/sports-teacher/students", headers=auth, params={"keyword": "CODEX_TEST_100001"}).json()["total"] == 1
+        assert client.get("/api/v1/sports-teacher/students", headers=auth, params={"keyword": "80100001"}).json()["total"] == 1
 
         team = client.post(
             "/api/v1/sports-teacher/college-teams",
@@ -417,9 +417,9 @@ def test_result_state_machine_ties_snapshot_promotion_audit_and_permissions():
         assert [row["status"] for row in next_round].count("REGISTERED") == 2
         assert [row["status"] for row in next_round].count("ALTERNATE") == 1
 
-        activated = client.post("/api/v1/auth/student-register", json={"student_no": "CODEX_TEST_200001", "name": "CODEX_TEST_学生_200001"})
+        activated = client.post("/api/v1/auth/student-register", json={"student_no": "80200001", "name": "CODEX_TEST_学生_200001"})
         assert activated.status_code == 200, activated.text
-        student_login = _login(client, "student", "CODEX_TEST_200001", "DFCODEX_TEST_200001")
+        student_login = _login(client, "student", "80200001", "DF80200001")
         student_auth = _headers(student_login["access_token"])
         assert any(row["event_id"] == event_id for row in client.get("/api/v1/student/my-results", headers=student_auth).json())
         assert any(row["event_id"] == event_id and row["stage"] == "SEMIFINAL" for row in client.get("/api/v1/student/my-qualifications", headers=student_auth).json())
@@ -484,8 +484,8 @@ def test_excel_atomic_import_exports_sqlite_pragmas_foreign_keys_and_concurrency
     with TestClient(app) as client:
         auth = _teacher_headers(client)
         atomic_rows = [
-            ["CODEX_TEST_300001", "CODEX_TEST_原子学生1", "男", "CODEX_TEST_导入学院", "CODEX_TEST_专业", "CODEX_TEST_班"],
-            ["CODEX_TEST_300002", "CODEX_TEST_原子学生2", "未知", "CODEX_TEST_导入学院", "CODEX_TEST_专业", "CODEX_TEST_班"],
+            ["80300001", "CODEX_TEST_原子学生1", "男", "CODEX_TEST_导入学院", "CODEX_TEST_专业", "CODEX_TEST_班"],
+            ["80300002", "CODEX_TEST_原子学生2", "未知", "CODEX_TEST_导入学院", "CODEX_TEST_专业", "CODEX_TEST_班"],
         ]
         invalid = client.post(
             "/api/v1/sports-teacher/students/import",
@@ -494,11 +494,11 @@ def test_excel_atomic_import_exports_sqlite_pragmas_foreign_keys_and_concurrency
         )
         assert invalid.status_code == 422
         with SessionLocal() as db:
-            assert db.scalar(select(func.count(StudentRoster.id)).where(StudentRoster.student_no.in_(["CODEX_TEST_300001", "CODEX_TEST_300002"]))) == 0
+            assert db.scalar(select(func.count(StudentRoster.id)).where(StudentRoster.student_no.in_(["80300001", "80300002"]))) == 0
 
         valid_rows = [
-            ["CODEX_TEST_300011", "CODEX_TEST_导入学生1", "男", "CODEX_TEST_导入学院", "CODEX_TEST_专业", "CODEX_TEST_班"],
-            ["CODEX_TEST_300012", "CODEX_TEST_导入学生2", "女", "CODEX_TEST_导入学院", "CODEX_TEST_专业", "CODEX_TEST_班"],
+            ["80300011", "CODEX_TEST_导入学生1", "男", "CODEX_TEST_导入学院", "CODEX_TEST_专业", "CODEX_TEST_班"],
+            ["80300012", "CODEX_TEST_导入学生2", "女", "CODEX_TEST_导入学院", "CODEX_TEST_专业", "CODEX_TEST_班"],
         ]
         valid_bytes = workbook_bytes(valid_rows)
         imported = client.post(

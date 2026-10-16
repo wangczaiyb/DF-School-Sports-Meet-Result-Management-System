@@ -95,7 +95,9 @@ from .services import (
     validate_account_quota,
 )
 from .rope_rules import ROPE_RULES, rope_detail_payload, rope_lineup_status, rope_rule_for_event
-from .college_policy import configured_colleges, require_participating_college
+from .college_policy import DEFAULT_COLLEGES, configured_colleges, require_participating_college
+from .student_policy import STUDENT_NUMBER_ERROR, is_valid_student_number
+from .rope_college_sync import synchronize_rope_colleges
 
 
 router = APIRouter()
@@ -168,8 +170,6 @@ def student_register(data: StudentRegisterRequest, db: Session = Depends(get_db)
     )
     if not roster:
         raise HTTPException(404, "学号和姓名与参赛名单不匹配")
-    if len(data.student_no) < 6:
-        raise HTTPException(422, "学号不足 6 位，请联系管理员")
     if roster.activated or roster.user_id:
         raise HTTPException(409, "该学号已经注册")
     validate_account_quota(db, Role.STUDENT)
@@ -268,8 +268,8 @@ def list_accounts(
 
 @router.post("/developer/accounts")
 def create_account(data: AccountCreate, actor: User = Depends(developer_only), db: Session = Depends(get_db)):
-    if data.role == Role.STUDENT and not 6 <= len(data.username) <= 32:
-        raise HTTPException(422, "学生账号必须使用6至32位完整学号")
+    if data.role == Role.STUDENT and not is_valid_student_number(data.username):
+        raise HTTPException(422, STUDENT_NUMBER_ERROR)
     validate_account_quota(db, data.role)
     if db.scalar(select(User.id).where(User.username == data.username)):
         raise HTTPException(409, "用户名已存在")
@@ -303,6 +303,17 @@ def update_account(user_id: int, data: AccountUpdate, actor: User = Depends(deve
         raise HTTPException(404, "账号不存在")
     before = _account_dict(db, target)
     values = data.model_dump(exclude_unset=True)
+    if (data.role or target.role) == Role.STUDENT and not is_valid_student_number(data.username if data.username is not None else target.username):
+        raise HTTPException(422, STUDENT_NUMBER_ERROR)
+    if target.role == Role.STUDENT and data.username and data.username != target.username:
+        linked_student = db.scalar(select(StudentRoster).where(StudentRoster.user_id == target.id))
+        if linked_student:
+            if db.scalar(select(StudentRoster.id).where(StudentRoster.student_no == data.username, StudentRoster.id != linked_student.id)):
+                raise HTTPException(409, "该学号已存在于学生资料库")
+            linked_student.student_no = data.username
+        if verify_password(initial_student_password(target.username), target.password_hash):
+            target.password_hash = hash_password(initial_student_password(data.username))
+        target.token_version += 1
     if data.username and data.username != target.username and db.scalar(select(User.id).where(User.username == data.username)):
         raise HTTPException(409, "用户名已存在")
     if data.role and data.role != target.role:
@@ -560,7 +571,10 @@ def update_student_roster(student_id: int, data: StudentRosterCreate, actor: Use
         if user and values["student_no"] != row.student_no:
             if db.scalar(select(User.id).where(User.username == values["student_no"], User.id != user.id)):
                 raise HTTPException(409, "新学号已被其他账号使用")
+            if verify_password(initial_student_password(user.username), user.password_hash):
+                user.password_hash = hash_password(initial_student_password(values["student_no"]))
             user.username = values["student_no"]
+            user.token_version += 1
         if user:
             user.display_name = values["name"]
             user.department = values["college"]
@@ -633,8 +647,10 @@ def download_student_roster_template(_actor: User = Depends(business_admin)):
     ws = wb.active
     ws.title = "学生名单"
     ws.append(["学号*", "姓名*", "性别*", "学院*", "专业*", "班级*"])
-    ws.append(["2026001001", "张三", "男", "计算机与信息工程学院", "软件工程", "2601"])
-    ws.append(["2026001002", "李四", "女", "经济与管理学院", "国际贸易", "2602"])
+    ws.append(["26001001", "张三", "男", "信息工程学院", "软件工程", "2601"])
+    ws.append(["26002002", "李四", "女", "经济管理学院", "国际贸易", "2602"])
+    for row in ws.iter_rows(min_row=2):
+        row[0].number_format = "@"
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
@@ -653,8 +669,8 @@ def download_student_account_template(_actor: User = Depends(developer_only)):
     sheet = workbook.active
     sheet.title = "学生名单"
     sheet.append(["学号*", "姓名*", "性别", "学院", "专业", "班级"])
-    sheet.append(["2026001001", "张三"])
-    sheet.append(["2026001002", "李四"])
+    sheet.append(["26001001", "张三"])
+    sheet.append(["26001002", "李四"])
     sheet.freeze_panes = "A2"
     for column in "ABCDEF":
         sheet.column_dimensions[column].width = 22
@@ -706,8 +722,11 @@ def import_student_accounts(file: UploadFile = File(...), actor: User = Depends(
                     value = int(value)
                 values[field] = str(value).strip() if value is not None else ""
             student_no, name = values["student_no"], values["name"]
-            if not (6 <= len(student_no) <= 32 and 1 <= len(name) <= 64):
-                errors.append(f"第 {row_index} 行学号需为6至32位，姓名需为1至64字")
+            if not is_valid_student_number(student_no):
+                errors.append(f"第 {row_index} 行{STUDENT_NUMBER_ERROR}，请将学号列设为文本以保留前导零")
+                continue
+            if not 1 <= len(name) <= 64:
+                errors.append(f"第 {row_index} 行姓名需为1至64字")
                 continue
             if values["gender"] not in {"", "男", "女"} or any(len(values[field]) > 128 for field in ("college", "major", "class_name")):
                 errors.append(f"第 {row_index} 行性别或学生资料格式不正确")
@@ -818,8 +837,11 @@ def import_student_roster(file: UploadFile = File(...), actor: User = Depends(bu
             if not all(values):
                 errors.append(f"第 {row_index} 行存在空白必填字段")
                 continue
-            if len(student_no) < 6 or gender not in {"男", "女"}:
-                errors.append(f"第 {row_index} 行学号或性别格式不正确")
+            if not is_valid_student_number(student_no):
+                errors.append(f"第 {row_index} 行{STUDENT_NUMBER_ERROR}，请将学号列设为文本以保留前导零")
+                continue
+            if gender not in {"男", "女"}:
+                errors.append(f"第 {row_index} 行性别必须为男或女")
                 continue
             if student_no in seen or db.scalar(select(StudentRoster.id).where(StudentRoster.student_no == student_no)):
                 skipped += 1
@@ -1006,7 +1028,7 @@ def generate_college_teams(data: CollegeTeamGenerate, actor: User = Depends(busi
     suffix = f"{event.name}代表队" if event else "代表队"
     colleges = configured_colleges(db)
     if colleges is None:
-        colleges = [str(value).strip() for value in db.scalars(select(StudentRoster.college).distinct().order_by(StudentRoster.college)) if str(value).strip()]
+        colleges = list(DEFAULT_COLLEGES)
     existing = set(db.scalars(select(CollegeTeam.team_name).where(CollegeTeam.meet_id == data.meet_id, CollegeTeam.event_id == event_id)))
     created = 0
     for college in colleges:
@@ -2254,33 +2276,15 @@ def initialize_rope_events(data: RopeInitializeRequest, actor: User = Depends(bu
         sync_event_rounds(db, event_id=event.id)
         events.append(event)
 
-    teams = list(
-        db.scalars(
-            select(CollegeTeam)
-            .where(CollegeTeam.meet_id == meet.id, CollegeTeam.event_id.is_(None))
-            .order_by(CollegeTeam.college, CollegeTeam.id)
-        )
-    )
-    for event in events:
-        round_row = db.scalar(select(EventRound).where(EventRound.event_id == event.id, EventRound.stage == "FINAL"))
-        for team in teams:
-            registration = db.scalar(
-                select(Registration.id).where(
-                    Registration.event_id == event.id,
-                    Registration.round_id == round_row.id,
-                    Registration.college_team_id == team.id,
-                )
-            )
-            if not registration:
-                db.add(Registration(event_id=event.id, round_id=round_row.id, college_team_id=team.id, status="REGISTERED"))
-                created_registrations += 1
+    college_sync = synchronize_rope_colleges(db, meet.id, actor)
+    created_registrations = college_sync["created_registrations"]
     audit(
         db,
         actor,
         "INITIALIZE_ROPE_EVENTS",
         "sports_meet",
         meet.id,
-        after={"created_events": created_events, "created_registrations": created_registrations},
+        after={"created_events": created_events, **college_sync},
     )
     db.commit()
 
@@ -2344,8 +2348,9 @@ def initialize_rope_events(data: RopeInitializeRequest, actor: User = Depends(bu
     db.commit()
     model_tip = f"，并{'新建' if created_model else '复用'}了默认计分模型（前8名 9-7-6-5-4-3-2-1 分）"
     return {
-        "message": f"跳绳赛制已就绪：新增 {created_events} 个项目、{created_registrations} 条学院报名记录{model_tip}",
+        "message": f"跳绳赛制已就绪：新增 {created_events} 个项目、{created_registrations} 条学院报名记录，已关联 {college_sync['college_count']} 个学院{model_tip}",
         "event_ids": [event.id for event in events],
+        **college_sync,
     }
 
 

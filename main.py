@@ -23,7 +23,7 @@ LOCAL_HOST = "127.0.0.1"
 DEPENDENCIES = ("uvicorn", "fastapi", "sqlalchemy", "alembic", "pydantic_settings",
                 "jwt", "bcrypt", "openpyxl", "multipart", "httpx", "cryptography")
 # 只有提供当前跳绳表格功能的本系统才可复用，旧版或其他服务不作复用。
-REQUIRED_FEATURES = {"rope-skipping-workbench", "rope-registration-tables", "ai-copilot-platform", "configured-college-team-scope", "college-roster-render-sync"}
+REQUIRED_FEATURES = {"rope-skipping-workbench", "rope-registration-tables", "ai-copilot-platform", "configured-college-team-scope", "college-roster-render-sync", "rope-college-registration-sync"}
 HTTP = build_opener(ProxyHandler({}))
 
 

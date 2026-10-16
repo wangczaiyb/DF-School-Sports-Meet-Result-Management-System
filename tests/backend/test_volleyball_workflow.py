@@ -56,10 +56,10 @@ def test_volleyball_full_tournament_and_gender_rules_workflow():
         # 为各代表队创建学生名单（男、女生）
         for idx, c in enumerate(colleges):
             # 每队创建 2 名男生和 2 名女生（满足女生不少于 2 人）
-            s_m1 = client.post("/api/v1/sports-teacher/students", headers=auth, json={"student_no": f"202699{idx}01", "name": f"{c}男甲", "gender": "男", "college": c, "major": "通用专业", "class_name": "2601"}).json()
-            s_m2 = client.post("/api/v1/sports-teacher/students", headers=auth, json={"student_no": f"202699{idx}02", "name": f"{c}男乙", "gender": "男", "college": c, "major": "通用专业", "class_name": "2601"}).json()
-            s_f1 = client.post("/api/v1/sports-teacher/students", headers=auth, json={"student_no": f"202699{idx}03", "name": f"{c}女甲", "gender": "女", "college": c, "major": "通用专业", "class_name": "2601"}).json()
-            s_f2 = client.post("/api/v1/sports-teacher/students", headers=auth, json={"student_no": f"202699{idx}04", "name": f"{c}女乙", "gender": "女", "college": c, "major": "通用专业", "class_name": "2601"}).json()
+            s_m1 = client.post("/api/v1/sports-teacher/students", headers=auth, json={"student_no": f"2699{idx:02d}01", "name": f"{c}男甲", "gender": "男", "college": c, "major": "通用专业", "class_name": "2601"}).json()
+            s_m2 = client.post("/api/v1/sports-teacher/students", headers=auth, json={"student_no": f"2699{idx:02d}02", "name": f"{c}男乙", "gender": "男", "college": c, "major": "通用专业", "class_name": "2601"}).json()
+            s_f1 = client.post("/api/v1/sports-teacher/students", headers=auth, json={"student_no": f"2699{idx:02d}03", "name": f"{c}女甲", "gender": "女", "college": c, "major": "通用专业", "class_name": "2601"}).json()
+            s_f2 = client.post("/api/v1/sports-teacher/students", headers=auth, json={"student_no": f"2699{idx:02d}04", "name": f"{c}女乙", "gender": "女", "college": c, "major": "通用专业", "class_name": "2601"}).json()
 
             # 前 5 队正常添加 2 女 2 男，第 6 队先只加 1 女 2 男（用于测试性别不足警告）
             if idx < 5:

@@ -69,12 +69,12 @@ def test_full_system_end_to_end_cross_module_workflow():
         # ======================================================================
         colleges = ["计算机学院", "软件学院", "理学院", "商学院"]
         students_by_college = {}
-        for c in colleges:
+        for college_index, c in enumerate(colleges):
             students_by_college[c] = {"male": [], "female": []}
             # 创建 4 男 3 女
             for i in range(4):
                 s = client.post("/api/v1/sports-teacher/students", headers=auth, json={
-                    "student_no": f"2026_{c[:2]}_M{i+1}",
+                    "student_no": f"710{college_index}1{i+1:03d}",
                     "name": f"{c}男队员{i+1}",
                     "gender": "男",
                     "college": c,
@@ -85,7 +85,7 @@ def test_full_system_end_to_end_cross_module_workflow():
 
             for j in range(3):
                 s = client.post("/api/v1/sports-teacher/students", headers=auth, json={
-                    "student_no": f"2026_{c[:2]}_F{j+1}",
+                    "student_no": f"710{college_index}2{j+1:03d}",
                     "name": f"{c}女队员{j+1}",
                     "gender": "女",
                     "college": c,
@@ -106,7 +106,7 @@ def test_full_system_end_to_end_cross_module_workflow():
         }).json()["event"]
 
         bb_teams = []
-        for c in colleges:
+        for college_index, c in enumerate(colleges):
             t = client.post("/api/v1/sports-teacher/college-teams", headers=auth, json={
                 "meet_id": meet_id,
                 "event_id": bb_event["id"],
@@ -131,7 +131,7 @@ def test_full_system_end_to_end_cross_module_workflow():
         }).json()["event"]
 
         vb_teams = []
-        for c in colleges:
+        for college_index, c in enumerate(colleges):
             t = client.post("/api/v1/sports-teacher/college-teams", headers=auth, json={
                 "meet_id": meet_id,
                 "event_id": vb_event["id"],
@@ -156,7 +156,7 @@ def test_full_system_end_to_end_cross_module_workflow():
         }).json()["event"]
 
         tt_teams = []
-        for c in colleges:
+        for college_index, c in enumerate(colleges):
             t = client.post("/api/v1/sports-teacher/college-teams", headers=auth, json={
                 "meet_id": meet_id,
                 "event_id": tt_event["id"],

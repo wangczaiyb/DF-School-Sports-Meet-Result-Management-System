@@ -24,7 +24,7 @@ test('public results expose only published records and masked student numbers', 
     }
   }
   await expect(page.getByText('男子100米').first()).toBeVisible()
-  await expect(page.getByText('20******01').first()).toBeVisible()
+  await expect(page.getByText('26****01').first()).toBeVisible()
   await expect(page.getByText('张晨').first()).toBeVisible()
 })
 
@@ -34,7 +34,7 @@ test('core CRUD and result workflow persist through UI, API, public polling and 
   const meetName = `CODEX_TEST_E2E_运动会_${suffix}`
   const eventName = `CODEX_TEST_E2E_男子测试跑_${suffix}`
   const eventCode = `CE${suffix.slice(-8)}`
-  const studentNo = `CODEX_TEST_${suffix.slice(-10)}`
+  const studentNo = suffix.slice(-8)
   const studentName = `CODEX_TEST_E2E_学生_${suffix.slice(-6)}`
   const apiBase = 'http://127.0.0.1:8001/api/v1'
 

@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { errorMessage } from '../api'
+import registrationTemplateUrl from '../assets/rope-registration-template.xlsx?url'
 
 const props = defineProps<{ meetId: number | null; eventId: number | null; events: any[]; canManage: boolean }>()
 const emit = defineEmits<{ changed: [] }>()
@@ -20,6 +21,7 @@ const teams = computed(() => {
   for (const event of props.events) for (const team of event.teams || []) unique.set(team.team_id, team)
   return [...unique.values()]
 })
+const collegeCount = computed(() => new Set(teams.value.map(team => team.college)).size)
 
 function openImport() {
   if (!props.meetId) return ElMessage.warning('请先选择运动会')
@@ -28,6 +30,13 @@ function openImport() {
   file.value = null
   importWarnings.value = []
   importDialog.value = true
+}
+
+function downloadTemplate() {
+  const link = document.createElement('a')
+  link.href = registrationTemplateUrl
+  link.download = '跳绳比赛报名表模板.xlsx'
+  link.click()
 }
 
 function selectFile(event: Event) {
@@ -121,13 +130,15 @@ const projectLabel: Record<string, string> = { ROPE_SINGLE: '计时计数项目'
 <template>
   <section class="mac-card panel" style="margin-bottom:14px">
     <h3 style="margin:0 0 10px;font-size:16px">报名表与比赛用表</h3>
-    <p style="margin:0 0 14px;color:#666;font-size:13px">导入各学院报名名单，配置三个项目阵容后导出手写登记表。成绩和备注两列留空，比赛后由裁判在成绩工作台录入。</p>
+    <p style="margin:0 0 14px;color:#666;font-size:13px">先下载模板填写各学院报名名单，导入并配置三个项目阵容后导出手写登记表。成绩和备注两列留空，比赛后由裁判在成绩工作台录入。</p>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <el-button v-if="canManage" :disabled="busy" @click="downloadTemplate">下载模板</el-button>
       <el-button v-if="canManage" type="primary" :disabled="busy" @click="openImport">导入报名表</el-button>
       <el-button v-if="canManage" :disabled="busy || !events.length" @click="drawDialog = true">随机抽签 / 生成赛程</el-button>
       <el-select v-model="exportTeamId" clearable placeholder="全部学院" style="width:200px">
         <el-option v-for="team in teams" :key="team.team_id" :label="`${team.college} · ${team.team_name}`" :value="team.team_id"/>
       </el-select>
+      <span v-if="events.length" style="font-size:12px;color:#666">已关联 {{ collegeCount }} 个学院</span>
       <el-select v-model="exportEventId" clearable placeholder="三个小项目" style="width:180px">
         <el-option v-for="event in events" :key="event.id" :label="event.rule.title" :value="event.id"/>
       </el-select>
@@ -144,6 +155,7 @@ const projectLabel: Record<string, string> = { ROPE_SINGLE: '计时计数项目'
 
   <el-dialog v-model="importDialog" title="识别学院跳绳报名表" width="min(1000px, 94vw)" :close-on-click-modal="false">
     <el-alert type="info" :closable="false" title="支持.xlsx、.csv；自动识别表头别名、工作表项目名称、代表队信息和合并的学院列。导入只处理报名信息，成绩仍由裁判手动登记。"/>
+    <p style="margin:12px 0 0;font-size:13px;color:#666">模板含22人总名单及三个项目报名页。学号须为8位数字，前两位表示年级（如24表示24级），请按文本填写以保留前导零，同一队员在各页的信息保持一致；跳绳者、摇绳者填写在对应区域。</p>
     <el-form label-width="110px" style="margin-top:16px" :disabled="busy" @change="preview = null">
       <el-form-item label="报名文件"><input type="file" accept=".xlsx,.csv" @change="selectFile"/></el-form-item>
       <el-form-item label="默认学院"><el-input v-model="importForm.college" placeholder="表格没有学院列时填写；多学院总表请填写学院列" @input="preview = null"/></el-form-item>

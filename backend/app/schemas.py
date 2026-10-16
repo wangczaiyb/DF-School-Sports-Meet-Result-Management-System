@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .student_policy import StudentNumber
+
 
 class LoginRequest(BaseModel):
     username: str
@@ -11,7 +13,7 @@ class LoginRequest(BaseModel):
 
 
 class StudentRegisterRequest(BaseModel):
-    student_no: str
+    student_no: StudentNumber
     name: str
 
 
@@ -61,7 +63,7 @@ class MeetCreate(BaseModel):
 
 
 class StudentRosterCreate(BaseModel):
-    student_no: str = Field(min_length=6, max_length=32)
+    student_no: StudentNumber
     name: str = Field(min_length=1, max_length=64)
     gender: str
     college: str = Field(min_length=1, max_length=128)

@@ -1,5 +1,6 @@
 """报名识别、学院登记表、抽签赛程和发布快照汇总的端到端验证。"""
 from io import BytesIO
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -38,8 +39,8 @@ def workbook_bytes(workbook):
 def registration_bytes(prefix, college, explicit_roles=True):
     book = Workbook()
     book.remove(book.active)
-    male = [(f'{prefix}M{i:03d}', f'男队员{i}', '男') for i in range(1, 12)]
-    female = [(f'{prefix}F{i:03d}', f'女队员{i}', '女') for i in range(1, 12)]
+    male = [(f'{prefix}1{i:02d}', f'男队员{i}', '男') for i in range(1, 12)]
+    female = [(f'{prefix}2{i:02d}', f'女队员{i}', '女') for i in range(1, 12)]
     for title, jumpers, turners in [
         ('计时计数项目', male[:5] + female[:5], []),
         ('集体单摇跳', male[:5] + female[:5], male[-1:] + female[-1:]),
@@ -65,9 +66,44 @@ def status(ctx):
     return client.get('/api/v1/sports-teacher/rope/status', headers=headers, params={'meet_id': meet_id}).json()
 
 
+def test_download_template_can_import_roster_and_both_role_sections(rope_context):
+    template = Path(__file__).resolve().parents[2] / 'frontend/src/assets/rope-registration-template.xlsx'
+    book = load_workbook(template)
+    assert book.sheetnames == ['运动员汇总表（22人）', '1.前单跳', '2.集体单摇跳', '3.“8”字环绕跳']
+    male = list(range(1, 12))
+    female = list(range(12, 23))
+    turners = [11, 22]
+    groups = [male + female, male[:5] + female[:5], male[:5] + female[:5] + turners,
+              male[:10] + female[:10] + turners]
+    prefix = f'8{rope_context[2]:04d}'
+    for sheet, members in zip(book, groups):
+        rows = [row for row in range(3, sheet.max_row + 1) if isinstance(sheet.cell(row, 1).value, int)]
+        assert len(rows) == len(members)
+        for row, person in zip(rows, members):
+            assert all(sheet.cell(row, col).value is None for col in range(2, 6))
+            assert sheet.cell(row, 3).number_format == '@'
+            sheet.cell(row, 2, '模板验证学院')
+            sheet.cell(row, 3, f'{prefix}{person:03d}')
+            sheet.cell(row, 4, f'队员{person}')
+            sheet.cell(row, 5, '男' if person in male else '女')
+    content = workbook_bytes(book)
+    response = upload(rope_context, content, path='import/preview')
+    assert response.status_code == 200, response.text
+    preview = response.json()
+    assert preview['participants'] == 22 and preview['entries'] == 66
+    assert not preview['errors'] and not preview['warnings']
+    for code in ('ROPE_SYNC', 'ROPE_FIG8'):
+        assert {row['student_no'] for row in preview['records'] if row['event_code'] == code and row['role'] == 'TURNER'} == {
+            f'{prefix}{person:03d}' for person in turners}
+    response = upload(rope_context, content)
+    assert response.status_code == 200, response.text
+    assert not response.json()['warnings']
+    assert all(event['teams'][0]['lineup_status']['valid'] for event in status(rope_context)['events'])
+
+
 def test_import_preview_and_college_print_sheets(rope_context):
     ctx = rope_context
-    content = registration_bytes(f'IO{ctx[2]:04d}', '表格甲学院')
+    content = registration_bytes(f'1{ctx[2]:04d}', '表格甲学院')
     with SessionLocal() as db:
         before = db.scalar(select(func.count(StudentRoster.id)))
     response = upload(ctx, content, path='import/preview')
@@ -88,7 +124,7 @@ def test_import_preview_and_college_print_sheets(rope_context):
         assert db.scalar(select(func.count(RopeLineupMember.id)).where(RopeLineupMember.college_team_id == team_id)) == 44
         assert db.scalar(select(func.count(Result.id)).where(Result.event_id.in_([event['id'] for event in imported['events']]))) == 0
     assert all(event['teams'][0]['lineup_status']['valid'] for event in imported['events'])
-    other = upload(ctx, registration_bytes(f'IB{ctx[2]:04d}', '表格乙学院'))
+    other = upload(ctx, registration_bytes(f'2{ctx[2]:04d}', '表格乙学院'))
     assert other.status_code == 200, other.text
     client, headers, meet_id = ctx
     exported = client.get('/api/v1/admin/rope/record-sheets/export', headers=headers, params={'meet_id': meet_id, 'team_id': team_id})
@@ -99,7 +135,7 @@ def test_import_preview_and_college_print_sheets(rope_context):
         assert sheet['A3'].value.startswith('代表队：表格甲学院')
         assert '表格乙学院' not in str(list(sheet.values))
         assert [sheet.cell(6, column).value for column in range(1, 7)] == ['序号', '学号', '姓名', '性别', '成绩', '备注']
-        assert sheet['B7'].value.startswith(f'IO{meet_id:04d}')
+        assert sheet['B7'].value.startswith(f'1{meet_id:04d}')
         assert all(sheet.cell(row, 2).data_type == 's' for row in range(7, 7 + size))
         assert all(sheet.cell(row, column).value is None for row in range(7, 7 + size) for column in (5, 6))
         assert all(sheet.cell(row, column).value for row in range(7, 7 + size) for column in (2, 3, 4))
@@ -109,7 +145,7 @@ def test_import_preview_and_college_print_sheets(rope_context):
 
 def test_missing_roles_need_explicit_choice_and_conflicts_are_atomic(rope_context):
     ctx = rope_context
-    content = registration_bytes(f'IR{ctx[2]:04d}', '角色学院', explicit_roles=False)
+    content = registration_bytes(f'3{ctx[2]:04d}', '角色学院', explicit_roles=False)
     preview = upload(ctx, content, path='import/preview').json()
     assert not preview['errors'] and preview['warnings']
     explicit = upload(ctx, content, path='import/preview', last_two_turners='true').json()
@@ -150,10 +186,26 @@ def test_merged_college_multi_project_csv_and_text_ids(rope_context):
     assert not response.json()['errors']
 
 
+@pytest.mark.parametrize('number', ['1234567', '123456789', 'ABCDEFGH', '1234_678', '１２３４５６７８'])
+def test_rope_import_rejects_non_eight_digit_numbers_atomically(rope_context, number):
+    book = Workbook()
+    book.active.append(['学号', '姓名', '性别', '学院'])
+    book.active.append(['00123459', '有效学生', '男', '校验学院'])
+    book.active.append([number, '无效学生', '女', '校验学院'])
+    content = workbook_bytes(book)
+    preview = upload(rope_context, content, path='import/preview').json()
+    assert any('8位数字' in error for error in preview['errors'])
+    with SessionLocal() as db:
+        before = db.scalar(select(func.count(StudentRoster.id)))
+    assert upload(rope_context, content).status_code == 422
+    with SessionLocal() as db:
+        assert db.scalar(select(func.count(StudentRoster.id))) == before
+
+
 def test_draw_generates_nonoverlapping_drafts_and_exports(rope_context):
     ctx = rope_context
     for suffix, college in [('A', '抽签甲学院'), ('B', '抽签乙学院')]:
-        assert upload(ctx, registration_bytes(f'D{ctx[2]:04d}{suffix}', college)).status_code == 200
+        assert upload(ctx, registration_bytes(f'4{ctx[2]:03d}{ord(suffix) - ord("A")}', college)).status_code == 200
     client, headers, meet_id = ctx
     payload = {'meet_id': meet_id, 'competition_at': '2026-10-20T09:00:00', 'venue': '体育馆', 'slot_minutes': 15}
     response = client.post('/api/v1/sports-teacher/rope/draw', headers=headers, json=payload)
@@ -176,7 +228,7 @@ def test_draw_generates_nonoverlapping_drafts_and_exports(rope_context):
 def test_summary_uses_published_snapshots_ties_and_incomplete_status(rope_context):
     ctx = rope_context
     for suffix, college in [('A', '排名甲学院'), ('B', '排名乙学院'), ('C', '未发布学院')]:
-        assert upload(ctx, registration_bytes(f'S{ctx[2]:04d}{suffix}', college)).status_code == 200
+        assert upload(ctx, registration_bytes(f'5{ctx[2]:03d}{ord(suffix) - ord("A")}', college)).status_code == 200
     client, headers, meet_id = ctx
     result_ids = []
     for event in status(ctx)['events']:

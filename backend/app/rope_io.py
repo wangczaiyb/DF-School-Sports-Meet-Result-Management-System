@@ -31,13 +31,14 @@ from .models import (CollegeTeam, CollegeTeamMember, Event, EventRound, EventSch
 from .rope_rules import ROPE_RULES, rope_lineup_status
 from .services import audit, require_event_permission, result_dict
 from .college_policy import configured_colleges
+from .student_policy import STUDENT_NUMBER_ERROR, is_valid_student_number
 
 router = APIRouter()
 MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 SHEET_TITLES = {"ROPE_SINGLE": "计时计数项目", "ROPE_SYNC": "集体单摇跳", "ROPE_FIG8": "8字绕绳跳"}
 ALIASES = {
     "student_no": {"学号", "学生学号", "学生编号", "学生号"},
-    "name": {"姓名", "学生姓名", "运动员姓名", "参赛者姓名"},
+    "name": {"姓名", "学生姓名", "运动员姓名", "参赛者姓名", "姓名跳绳者", "姓名摇绳者"},
     "gender": {"性别", "男女"},
     "college": {"学院", "院系", "所属学院", "参赛学院", "代表队", "单位", "系别"},
     "event_code": {"项目", "参赛项目", "比赛项目", "报名项目", "小项目"},
@@ -132,6 +133,7 @@ def read_registration(file: UploadFile, college: str, default_event: str, last_t
             columns = {}
             context_college = college.strip() or (sheet.title if sheet.title.endswith("学院") else "")
             context_event = event_code(sheet.title) or default_event
+            context_role = ""
             sheet_count = 0
             # 兼容纵向合并的学院和项目列，保留原表行号用于报错。
             for merged in list(sheet.merged_cells.ranges):
@@ -145,6 +147,8 @@ def read_registration(file: UploadFile, college: str, default_event: str, last_t
                 found = {field: index for index, value in enumerate(values)
                          for field, aliases in ALIASES.items() if clean(value) in aliases}
                 if "student_no" in found and "name" in found:
+                    name_header = clean(values[found["name"]])
+                    context_role = "TURNER" if "摇绳者" in name_header else "JUMPER" if "跳绳者" in name_header else ""
                     found.update({f"project_{code}": index for index, value in enumerate(values)
                                   if (code := event_code(value))})
                     columns = found
@@ -171,11 +175,9 @@ def read_registration(file: UploadFile, college: str, default_event: str, last_t
                     errors.append(f"{location}：{exc}")
                     continue
                 no = record.get("student_no", "")
-                if not 6 <= len(no) <= 32 or not re.fullmatch(r"[A-Za-z0-9_-]+", no):
-                    errors.append(f"{location}：学号须为6至32位字母/数字，请将学号列设为文本")
+                if not is_valid_student_number(no):
+                    errors.append(f"{location}：{STUDENT_NUMBER_ERROR}，请将学号列设为文本以保留前导零")
                     continue
-                if isinstance(cells[columns["student_no"]].value, (int, float)) and len(no) > 15:
-                    errors.append(f"{location}：超过15位的数字学号可能丢失精度，请使用文本学号")
                 record["gender"] = {"男生": "男", "男性": "男", "M": "男", "MALE": "男",
                                     "女生": "女", "女性": "女", "F": "女", "FEMALE": "女"}.get(
                                         record.get("gender", "").upper(), record.get("gender", ""))
@@ -189,7 +191,7 @@ def read_registration(file: UploadFile, college: str, default_event: str, last_t
                     codes = [code for code, value in project_columns.items() if value and clean(value).upper() not in {"0", "否", "未报名", "×", "X", "FALSE"}]
                 elif not codes:
                     codes = [context_event] if context_event else []
-                raw_role = record.get("role", "")
+                raw_role = record.get("role", "") or context_role
                 record["role"] = {"跳绳者": "JUMPER", "跳绳": "JUMPER", "队员": "JUMPER", "JUMPER": "JUMPER",
                                   "摇绳者": "TURNER", "摇绳": "TURNER", "TURNER": "TURNER"}.get(raw_role.upper(), "")
                 if raw_role and not record["role"]:
